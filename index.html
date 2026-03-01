@@ -5,1656 +5,818 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AETHER — 3D Particle Sculptor</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --glass: rgba(255,255,255,0.04);
-    --glass-border: rgba(255,255,255,0.10);
-    --glass-hover: rgba(255,255,255,0.08);
-    --accent: rgba(180,220,255,0.9);
-    --accent2: rgba(200,180,255,0.8);
-    --accent3: rgba(180,255,220,0.7);
-    --text: rgba(255,255,255,0.88);
-    --text-dim: rgba(255,255,255,0.45);
-    --blur: blur(20px);
-    --blur-sm: blur(10px);
-  }
-
-  * { margin:0; padding:0; box-sizing:border-box; }
-
-  body {
-    font-family: 'Outfit', sans-serif;
-    background: #050810;
-    color: var(--text);
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-  }
-
-  /* ===== BACKGROUND ===== */
-  #bg-canvas {
-    position: fixed; inset: 0; z-index: 0;
-  }
-
-  .noise {
-    position: fixed; inset: 0; z-index: 1;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none; opacity: 0.5;
-  }
-
-  /* ===== MAIN LAYOUT ===== */
-  #app {
-    position: relative; z-index: 10;
-    width: 100vw; height: 100vh;
-    display: grid;
-    grid-template-columns: 280px 1fr 280px;
-    grid-template-rows: 60px 1fr 80px;
-    gap: 0;
-    padding: 12px;
-    pointer-events: none;
-  }
-
-  /* ===== GLASSMORPHISM BASE ===== */
-  .glass {
-    background: var(--glass);
-    backdrop-filter: var(--blur);
-    -webkit-backdrop-filter: var(--blur);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    pointer-events: all;
-  }
-
-  .glass-sm {
-    background: var(--glass);
-    backdrop-filter: var(--blur-sm);
-    -webkit-backdrop-filter: var(--blur-sm);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    pointer-events: all;
-  }
-
-  /* ===== HEADER ===== */
-  #header {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    margin-bottom: 8px;
-  }
-
-  .logo {
-    font-family: 'Space Mono', monospace;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.3em;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .header-status {
-    display: flex; gap: 12px; align-items: center;
-  }
-
-  .status-chip {
-    font-size: 10px;
-    font-family: 'Space Mono', monospace;
-    letter-spacing: 0.1em;
-    padding: 4px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--glass-border);
-    background: var(--glass);
-    backdrop-filter: var(--blur-sm);
-    display: flex; align-items: center; gap: 6px;
-    transition: all 0.3s;
-  }
-
-  .status-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: rgba(180,255,180,0.8);
-    box-shadow: 0 0 6px rgba(180,255,180,0.6);
-    animation: pulse-dot 2s infinite;
-  }
-
-  .status-dot.inactive { background: rgba(255,180,180,0.8); box-shadow: 0 0 6px rgba(255,180,180,0.6); animation: none; }
-
-  @keyframes pulse-dot {
-    0%,100% { opacity:1; transform: scale(1); }
-    50% { opacity:0.5; transform: scale(0.7); }
-  }
-
-  /* ===== LEFT PANEL ===== */
-  #left-panel {
-    grid-row: 2;
-    grid-column: 1;
-    padding: 16px;
-    display: flex; flex-direction: column; gap: 10px;
-    overflow-y: auto;
-    scrollbar-width: none;
-    margin-right: 8px;
-  }
-
-  #left-panel::-webkit-scrollbar { display: none; }
-
-  .panel-title {
-    font-size: 9px;
-    font-family: 'Space Mono', monospace;
-    letter-spacing: 0.2em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-    padding: 0 2px;
-  }
-
-  /* ===== GESTURE DISPLAY ===== */
-  #gesture-card {
-    padding: 14px;
-  }
-
-  .gesture-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-top: 8px;
-  }
-
-  .gesture-item {
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    transition: all 0.3s;
-    cursor: default;
-  }
-
-  .gesture-item.active {
-    background: rgba(180,220,255,0.08);
-    border-color: rgba(180,220,255,0.25);
-    box-shadow: 0 0 12px rgba(180,220,255,0.1);
-  }
-
-  .gesture-icon { font-size: 18px; display: block; margin-bottom: 3px; }
-
-  .gesture-name {
-    font-size: 9px;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-dim);
-    letter-spacing: 0.05em;
-  }
-
-  .gesture-action {
-    font-size: 10px;
-    color: var(--accent);
-    margin-top: 2px;
-  }
-
-  /* ===== SLIDERS ===== */
-  #controls-card { padding: 14px; }
-
-  .control-row {
-    margin-bottom: 12px;
-  }
-
-  .control-label {
-    display: flex; justify-content: space-between;
-    font-size: 11px; color: var(--text-dim);
-    margin-bottom: 5px;
-    font-family: 'Space Mono', monospace;
-  }
-
-  .control-val { color: var(--accent); }
-
-  input[type=range] {
-    width: 100%;
-    height: 3px;
-    -webkit-appearance: none;
-    background: rgba(255,255,255,0.1);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 8px rgba(180,220,255,0.6);
-    cursor: pointer;
-    transition: transform 0.2s;
-  }
-
-  input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.3); }
-
-  /* ===== PRESETS ===== */
-  #presets-card { padding: 14px; }
-
-  .preset-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-top: 8px;
-  }
-
-  .preset-btn {
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid var(--glass-border);
-    background: var(--glass);
-    color: var(--text);
-    font-size: 10px;
-    font-family: 'Space Mono', monospace;
-    cursor: pointer;
-    transition: all 0.25s;
-    letter-spacing: 0.05em;
-    text-align: center;
-  }
-
-  .preset-btn:hover {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(180,220,255,0.3);
-    color: var(--accent);
-    box-shadow: 0 0 12px rgba(180,220,255,0.1);
-    transform: translateY(-1px);
-  }
-
-  .preset-btn.active {
-    background: rgba(180,220,255,0.12);
-    border-color: rgba(180,220,255,0.4);
-    color: var(--accent);
-  }
-
-  /* ===== RIGHT PANEL ===== */
-  #right-panel {
-    grid-row: 2;
-    grid-column: 3;
-    padding: 16px;
-    display: flex; flex-direction: column; gap: 10px;
-    overflow-y: auto;
-    scrollbar-width: none;
-    margin-left: 8px;
-  }
-  #right-panel::-webkit-scrollbar { display: none; }
-
-  /* ===== WEBCAM FEED ===== */
-  #cam-card {
-    padding: 10px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  #cam-wrapper {
-    position: relative;
-    width: 100%;
-    border-radius: 10px;
-    overflow: hidden;
-    aspect-ratio: 4/3;
-    background: rgba(0,0,0,0.4);
-  }
-
-  #webcam {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-    display: block;
-    opacity: 0.85;
-  }
-
-  #hand-canvas {
-    position: absolute; top:0; left:0;
-    width: 100%; height: 100%;
-    transform: scaleX(-1);
-  }
-
-  .cam-overlay {
-    position: absolute; bottom: 6px; left: 6px;
-    font-size: 9px;
-    font-family: 'Space Mono', monospace;
-    color: rgba(255,255,255,0.5);
-    background: rgba(0,0,0,0.4);
-    padding: 3px 8px;
-    border-radius: 6px;
-    letter-spacing: 0.1em;
-  }
-
-  /* ===== COLOR PALETTE ===== */
-  #color-card { padding: 14px; }
-
-  .color-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
-    margin-top: 8px;
-  }
-
-  .color-swatch {
-    aspect-ratio: 1;
-    border-radius: 8px;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .color-swatch::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: inherit;
-    filter: brightness(1.4);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .color-swatch:hover::after { opacity: 0.4; }
-
-  .color-swatch:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 10px rgba(255,255,255,0.2);
-  }
-
-  .color-swatch.active {
-    border-color: white;
-    transform: scale(1.1);
-    box-shadow: 0 0 12px rgba(255,255,255,0.4);
-  }
-
-  /* ===== STATS CARD ===== */
-  #stats-card { padding: 14px; }
-
-  .stat-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 11px;
-  }
-
-  .stat-label { color: var(--text-dim); font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.1em; }
-  .stat-val { color: var(--accent); font-family: 'Space Mono', monospace; font-size: 11px; }
-
-  /* ===== BOTTOM BAR ===== */
-  #bottom-bar {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 0 20px;
-    margin-top: 8px;
-  }
-
-  .action-btn {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 20px;
-    border-radius: 12px;
-    border: 1px solid var(--glass-border);
-    background: var(--glass);
-    backdrop-filter: var(--blur-sm);
-    color: var(--text);
-    font-size: 11px;
-    font-family: 'Space Mono', monospace;
-    cursor: pointer;
-    transition: all 0.25s;
-    letter-spacing: 0.08em;
-  }
-
-  .action-btn:hover {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.2);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-  }
-
-  .action-btn.primary {
-    background: rgba(180,220,255,0.1);
-    border-color: rgba(180,220,255,0.3);
-    color: var(--accent);
-  }
-
-  .action-btn.danger {
-    background: rgba(255,100,100,0.06);
-    border-color: rgba(255,100,100,0.2);
-    color: rgba(255,160,160,0.9);
-  }
-
-  .action-btn .icon { font-size: 14px; }
-
-  /* ===== GESTURE TOOLTIP ===== */
-  #gesture-tooltip {
-    position: fixed;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 100;
-    pointer-events: none;
-    transition: all 0.3s;
-    opacity: 0;
-  }
-
-  #gesture-tooltip.show { opacity: 1; }
-
-  .tooltip-inner {
-    padding: 14px 24px;
-    border-radius: 16px;
-    background: rgba(20,20,40,0.7);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    border: 1px solid rgba(180,220,255,0.25);
-    font-size: 14px;
-    font-family: 'Space Mono', monospace;
-    color: var(--accent);
-    letter-spacing: 0.15em;
-    white-space: nowrap;
-    box-shadow: 0 0 30px rgba(180,220,255,0.15);
-    text-align: center;
-  }
-
-  .tooltip-inner .big { font-size: 28px; display: block; margin-bottom: 4px; }
-
-  /* ===== CURSOR RING ===== */
-  #cursor-ring {
-    position: fixed; z-index: 200;
-    pointer-events: none;
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    border: 2px solid rgba(180,220,255,0.6);
-    transform: translate(-50%, -50%);
-    transition: width 0.15s, height 0.15s, border-color 0.15s, background 0.15s;
-    box-shadow: 0 0 10px rgba(180,220,255,0.2);
-    display: none;
-  }
-
-  #cursor-ring.pinch {
-    width: 20px; height: 20px;
-    background: rgba(180,220,255,0.15);
-    border-color: rgba(180,220,255,0.9);
-    box-shadow: 0 0 20px rgba(180,220,255,0.5);
-  }
-
-  /* ===== LOADING SCREEN ===== */
-  #loading {
-    position: fixed; inset: 0; z-index: 1000;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: #050810;
-    transition: opacity 0.8s, visibility 0.8s;
-  }
-
-  #loading.fade { opacity: 0; visibility: hidden; }
-
-  .loading-logo {
-    font-family: 'Space Mono', monospace;
-    font-size: 36px;
-    font-weight: 700;
-    letter-spacing: 0.4em;
-    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 8px;
-    animation: shimmer 3s linear infinite;
-    background-size: 200%;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 200% 50%; }
-  }
-
-  .loading-sub {
-    font-size: 11px;
-    letter-spacing: 0.25em;
-    color: var(--text-dim);
-    margin-bottom: 40px;
-    font-family: 'Space Mono', monospace;
-  }
-
-  .loading-bar-wrap {
-    width: 200px; height: 2px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .loading-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 2px;
-    animation: load-progress 2.5s ease forwards;
-  }
-
-  @keyframes load-progress {
-    0% { width: 0%; }
-    60% { width: 70%; }
-    100% { width: 100%; }
-  }
-
-  .loading-status {
-    margin-top: 12px;
-    font-size: 10px;
-    font-family: 'Space Mono', monospace;
-    color: var(--text-dim);
-    letter-spacing: 0.15em;
-    height: 16px;
-  }
-
-  /* ===== NOTIFICATION ===== */
-  #notif {
-    position: fixed;
-    top: 80px; left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    z-index: 500;
-    pointer-events: none;
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
-  }
-
-  #notif.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  .notif-inner {
-    padding: 8px 20px;
-    border-radius: 30px;
-    background: rgba(20,30,50,0.8);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(180,220,255,0.2);
-    font-size: 11px;
-    font-family: 'Space Mono', monospace;
-    color: var(--accent);
-    letter-spacing: 0.1em;
-  }
-
-  /* ===== PARTICLE MODE INDICATOR ===== */
-  #mode-ring {
-    position: fixed;
-    pointer-events: none;
-    z-index: 150;
-    border-radius: 50%;
-    border: 1.5px solid transparent;
-    transform: translate(-50%, -50%);
-    transition: all 0.2s;
-    display: none;
-  }
-
-  /* ===== SCROLL FADE PANELS ===== */
-  #left-panel, #right-panel {
-    animation: fadeInSide 0.8s ease forwards;
-  }
-
-  @keyframes fadeInSide {
-    from { opacity:0; transform: translateX(-10px); }
-    to { opacity:1; transform: translateX(0); }
-  }
-
-  #right-panel { animation-name: fadeInRight; }
-  @keyframes fadeInRight {
-    from { opacity:0; transform: translateX(10px); }
-    to { opacity:1; transform: translateX(0); }
-  }
-
-  /* ===== TOUCH FALLBACK MODE ===== */
-  #touch-canvas {
-    position: fixed; inset: 0;
-    z-index: 5;
-    display: none;
-  }
-
-  /* ===== PROGRESS RINGS ===== */
-  .progress-ring {
-    display: block;
-    margin: 8px auto 0;
-  }
-
-  /* ===== RESPONSIVE ===== */
-  @media (max-width: 900px) {
-    #app { grid-template-columns: 1fr; grid-template-rows: 50px 1fr auto auto 60px; padding: 8px; }
-    #left-panel, #right-panel { grid-column: 1; display: flex; flex-direction: row; overflow-x: auto; margin: 0; }
-    #left-panel { grid-row: 3; }
-    #right-panel { grid-row: 4; }
-    #bottom-bar { grid-row: 5; flex-wrap: wrap; }
-    .gesture-grid { grid-template-columns: repeat(4,1fr); }
-    #left-panel > *, #right-panel > * { min-width: 220px; }
-  }
+:root {
+  --glass: rgba(255,255,255,0.05);
+  --glass-border: rgba(255,255,255,0.12);
+  --accent: rgba(180,220,255,0.95);
+  --accent2: rgba(200,180,255,0.85);
+  --accent3: rgba(180,255,220,0.75);
+  --text: rgba(255,255,255,0.9);
+  --text-dim: rgba(255,255,255,0.45);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#050810;color:var(--text);font-family:'Outfit',sans-serif;}
+#bg-canvas{position:fixed;inset:0;z-index:0;}
+.noise{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.4;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");}
+#app{position:relative;z-index:10;width:100vw;height:100vh;display:grid;
+  grid-template-columns:270px 1fr 270px;grid-template-rows:58px 1fr 72px;
+  gap:0;padding:10px;pointer-events:none;}
+.glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.1);border-radius:16px;pointer-events:all;}
+#header{grid-column:1/-1;grid-row:1;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;margin-bottom:8px;}
+.logo{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;letter-spacing:.35em;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;}
+.hchips{display:flex;gap:8px;align-items:center;}
+.chip{font-size:9px;font-family:'Space Mono',monospace;letter-spacing:.1em;padding:4px 10px;
+  border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(10px);display:flex;align-items:center;gap:5px;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(120,255,120,0.85);
+  box-shadow:0 0 6px rgba(120,255,120,.7);animation:pdot 2s infinite;}
+.dot.off{background:rgba(255,100,100,0.85);box-shadow:0 0 6px rgba(255,100,100,.7);animation:none;}
+@keyframes pdot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+#left-panel{grid-row:2;grid-column:1;padding:14px;display:flex;flex-direction:column;gap:9px;
+  overflow-y:auto;scrollbar-width:none;margin-right:8px;}
+#left-panel::-webkit-scrollbar{display:none;}
+#right-panel{grid-row:2;grid-column:3;padding:14px;display:flex;flex-direction:column;gap:9px;
+  overflow-y:auto;scrollbar-width:none;margin-left:8px;}
+#right-panel::-webkit-scrollbar{display:none;}
+.ptitle{font-size:9px;font-family:'Space Mono',monospace;letter-spacing:.2em;color:var(--text-dim);margin-bottom:6px;}
+.g-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:2px;}
+.g-item{padding:8px;border-radius:10px;background:rgba(255,255,255,0.025);
+  border:1px solid rgba(255,255,255,0.06);transition:all .3s;}
+.g-item.active{background:rgba(180,220,255,0.1);border-color:rgba(180,220,255,0.3);
+  box-shadow:0 0 12px rgba(180,220,255,0.12);}
+.g-icon{font-size:17px;display:block;margin-bottom:2px;}
+.g-name{font-size:8px;font-family:'Space Mono',monospace;color:var(--text-dim);}
+.g-act{font-size:9px;color:var(--accent);}
+.ctrl-row{margin-bottom:11px;}
+.ctrl-label{display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);
+  margin-bottom:4px;font-family:'Space Mono',monospace;}
+.ctrl-val{color:var(--accent);}
+input[type=range]{width:100%;height:3px;-webkit-appearance:none;background:rgba(255,255,255,0.1);
+  border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+  background:rgba(180,220,255,0.95);box-shadow:0 0 8px rgba(180,220,255,.5);cursor:pointer;transition:transform .2s;}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3);}
+.p-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:2px;}
+.pbtn{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.03);color:rgba(255,255,255,.7);font-size:9px;
+  font-family:'Space Mono',monospace;cursor:pointer;transition:all .25s;letter-spacing:.05em;}
+.pbtn:hover{background:rgba(255,255,255,0.08);border-color:rgba(180,220,255,.3);color:rgba(180,220,255,0.95);transform:translateY(-1px);}
+.pbtn.active{background:rgba(180,220,255,0.1);border-color:rgba(180,220,255,.4);color:rgba(180,220,255,0.95);}
+#cam-wrap{position:relative;width:100%;border-radius:10px;overflow:hidden;aspect-ratio:4/3;background:#000;}
+#webcam{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;}
+#hand-canvas{position:absolute;top:0;left:0;width:100%;height:100%;transform:scaleX(-1);}
+#cam-label{position:absolute;bottom:6px;left:6px;font-size:9px;font-family:'Space Mono',monospace;
+  color:rgba(255,255,255,.5);background:rgba(0,0,0,.55);padding:3px 7px;border-radius:5px;}
+.c-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:6px;}
+.cswatch{aspect-ratio:1;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:all .2s;}
+.cswatch:hover{transform:scale(1.15);box-shadow:0 0 10px rgba(255,255,255,.2);}
+.cswatch.active{border-color:#fff;transform:scale(1.1);box-shadow:0 0 12px rgba(255,255,255,.35);}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.slbl{color:var(--text-dim);font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.1em;}
+.sval{color:rgba(180,220,255,0.95);font-family:'Space Mono',monospace;font-size:10px;}
+#bottom-bar{grid-column:1/-1;grid-row:3;display:flex;align-items:center;justify-content:center;
+  gap:8px;padding:0 10px;flex-wrap:wrap;margin-top:8px;}
+.abtn{display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:12px;
+  border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:rgba(255,255,255,0.88);
+  font-size:10px;font-family:'Space Mono',monospace;cursor:pointer;transition:all .25s;
+  letter-spacing:.06em;pointer-events:all;-webkit-user-select:none;user-select:none;}
+.abtn:hover{background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.2);
+  transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.3);}
+.abtn:active{transform:translateY(0) !important;background:rgba(255,255,255,0.13);}
+.abtn.primary{background:rgba(180,220,255,0.1);border-color:rgba(180,220,255,.3);color:rgba(180,220,255,0.95);}
+.abtn.primary:hover{background:rgba(180,220,255,0.17);}
+.abtn.danger{background:rgba(255,80,80,0.07);border-color:rgba(255,120,120,.2);color:rgba(255,160,160,.9);}
+.abtn.danger:hover{background:rgba(255,80,80,0.14);}
+#cursor-ring{position:fixed;z-index:200;pointer-events:none;width:38px;height:38px;border-radius:50%;
+  border:2px solid rgba(180,220,255,.65);transform:translate(-50%,-50%);
+  transition:width .15s,height .15s,border-color .15s,background .15s;
+  box-shadow:0 0 10px rgba(180,220,255,.2);display:none;}
+#cursor-ring.pinch{width:18px;height:18px;background:rgba(180,220,255,.15);
+  border-color:rgba(180,220,255,.95);box-shadow:0 0 20px rgba(180,220,255,.5);}
+#g-tooltip{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.85);z-index:300;
+  pointer-events:none;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);}
+#g-tooltip.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+.tt-inner{padding:12px 22px;border-radius:16px;background:rgba(8,12,28,0.88);
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border:1px solid rgba(180,220,255,.25);font-family:'Space Mono',monospace;
+  color:rgba(180,220,255,0.95);letter-spacing:.15em;text-align:center;
+  box-shadow:0 0 30px rgba(180,220,255,.15);}
+.tt-emoji{font-size:26px;display:block;margin-bottom:4px;}
+.tt-text{font-size:11px;}
+#notif{position:fixed;top:75px;left:50%;transform:translateX(-50%) translateY(-15px);z-index:500;
+  pointer-events:none;opacity:0;transition:all .4s cubic-bezier(.34,1.56,.64,1);}
+#notif.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.notif-inner{padding:7px 18px;border-radius:30px;background:rgba(10,15,35,0.9);
+  backdrop-filter:blur(20px);border:1px solid rgba(180,220,255,.2);font-size:10px;
+  font-family:'Space Mono',monospace;color:rgba(180,220,255,0.95);letter-spacing:.1em;white-space:nowrap;}
+#loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:#050810;transition:opacity .8s,visibility .8s;}
+#loading.gone{opacity:0;visibility:hidden;pointer-events:none;}
+.ld-logo{font-family:'Space Mono',monospace;font-size:32px;font-weight:700;letter-spacing:.4em;
+  background:linear-gradient(135deg,rgba(180,220,255,0.95),rgba(200,180,255,0.85),rgba(180,255,220,0.75));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  background-size:200%;animation:shimmer 3s linear infinite;}
+@keyframes shimmer{0%{background-position:0% 50%;}100%{background-position:200% 50%;}}
+.ld-sub{font-size:10px;letter-spacing:.25em;color:var(--text-dim);margin:6px 0 35px;font-family:'Space Mono',monospace;}
+.ld-bar-bg{width:180px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;}
+.ld-bar{height:100%;background:linear-gradient(90deg,rgba(180,220,255,.95),rgba(200,180,255,.85));
+  border-radius:2px;width:0%;transition:width .5s ease;}
+.ld-status{margin-top:10px;font-size:9px;font-family:'Space Mono',monospace;color:var(--text-dim);letter-spacing:.1em;}
+#err-overlay{position:fixed;inset:0;z-index:800;display:none;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);}
+#err-overlay.show{display:flex;}
+.err-box{padding:28px 32px;border-radius:20px;background:rgba(12,18,35,0.97);
+  backdrop-filter:blur(30px);border:1px solid rgba(255,120,120,.25);max-width:380px;text-align:center;}
+.err-icon{font-size:30px;margin-bottom:10px;}
+.err-title{font-family:'Space Mono',monospace;font-size:13px;color:rgba(255,180,180,.9);
+  letter-spacing:.15em;margin-bottom:8px;}
+.err-msg{font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:18px;}
+.err-close{padding:9px 22px;border-radius:10px;border:1px solid rgba(255,120,120,.3);
+  background:rgba(255,80,80,0.1);color:rgba(255,180,180,.9);font-family:'Space Mono',monospace;
+  font-size:10px;cursor:pointer;letter-spacing:.1em;transition:all .2s;}
+.err-close:hover{background:rgba(255,80,80,0.22);}
+.pad14{padding:14px;}
 </style>
 </head>
 <body>
 
-<!-- Loading Screen -->
 <div id="loading">
-  <div class="loading-logo">AETHER</div>
-  <div class="loading-sub">3D PARTICLE SCULPTOR</div>
-  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
-  <div class="loading-status" id="loading-status">Initializing MediaPipe...</div>
+  <div class="ld-logo">AETHER</div>
+  <div class="ld-sub">3D PARTICLE SCULPTOR</div>
+  <div class="ld-bar-bg"><div class="ld-bar" id="ld-bar"></div></div>
+  <div class="ld-status" id="ld-status">Initialising...</div>
 </div>
 
-<!-- Background Three.js Canvas -->
-<canvas id="bg-canvas"></canvas>
-<div class="noise"></div>
-
-<!-- Cursor Ring (hand cursor) -->
-<div id="cursor-ring"></div>
-
-<!-- Gesture Tooltip -->
-<div id="gesture-tooltip">
-  <div class="tooltip-inner">
-    <span class="big" id="tooltip-emoji">👌</span>
-    <span id="tooltip-text">PINCH TO SPAWN</span>
+<div id="err-overlay">
+  <div class="err-box">
+    <div class="err-icon">📷</div>
+    <div class="err-title" id="err-title">ERROR</div>
+    <div class="err-msg" id="err-msg">An error occurred.</div>
+    <button class="err-close" id="err-close">DISMISS</button>
   </div>
 </div>
 
-<!-- Notification -->
-<div id="notif"><div class="notif-inner" id="notif-text"></div></div>
+<canvas id="bg-canvas"></canvas>
+<div class="noise"></div>
+<div id="cursor-ring"></div>
 
-<!-- Main App -->
+<div id="g-tooltip">
+  <div class="tt-inner">
+    <span class="tt-emoji" id="tt-emoji">✨</span>
+    <span class="tt-text" id="tt-text">READY</span>
+  </div>
+</div>
+
+<div id="notif"><div class="notif-inner" id="notif-text">—</div></div>
+
 <div id="app">
 
-  <!-- HEADER -->
   <header id="header" class="glass">
     <div class="logo">AETHER</div>
-    <div style="font-size:11px;color:var(--text-dim);letter-spacing:0.15em">3D PARTICLE SCULPTOR</div>
-    <div class="header-status">
-      <div class="status-chip">
-        <div class="status-dot inactive" id="cam-dot"></div>
-        <span id="cam-status-text">CAMERA OFF</span>
-      </div>
-      <div class="status-chip">
-        <div class="status-dot inactive" id="hand-dot"></div>
-        <span id="hand-status-text">NO HANDS</span>
-      </div>
-      <div class="status-chip" id="fps-chip">
-        <span id="fps-val">0</span><span style="color:var(--text-dim)"> FPS</span>
-      </div>
+    <div style="font-size:10px;color:var(--text-dim);letter-spacing:.15em;font-family:'Space Mono',monospace;">3D PARTICLE SCULPTOR</div>
+    <div class="hchips">
+      <div class="chip"><div class="dot off" id="cam-dot"></div><span id="cam-chip">CAM OFF</span></div>
+      <div class="chip"><div class="dot off" id="hand-dot"></div><span id="hand-chip">NO HAND</span></div>
+      <div class="chip"><span id="fps-num">--</span><span style="color:var(--text-dim);margin-left:3px;">FPS</span></div>
     </div>
   </header>
 
-  <!-- LEFT PANEL -->
   <aside id="left-panel">
-
-    <!-- Gesture Guide -->
-    <div class="glass gesture-card" id="gesture-card">
-      <div class="panel-title">✦ Gestures</div>
-      <div class="gesture-grid" id="gesture-grid">
-        <div class="gesture-item" id="g-pinch">
-          <span class="gesture-icon">🤏</span>
-          <div class="gesture-name">PINCH</div>
-          <div class="gesture-action">Spawn Particles</div>
-        </div>
-        <div class="gesture-item" id="g-open">
-          <span class="gesture-icon">🖐️</span>
-          <div class="gesture-name">OPEN</div>
-          <div class="gesture-action">Explode Burst</div>
-        </div>
-        <div class="gesture-item" id="g-point">
-          <span class="gesture-icon">☝️</span>
-          <div class="gesture-name">POINT</div>
-          <div class="gesture-action">Attract Swirl</div>
-        </div>
-        <div class="gesture-item" id="g-fist">
-          <span class="gesture-icon">✊</span>
-          <div class="gesture-name">FIST</div>
-          <div class="gesture-action">Gravity Pull</div>
-        </div>
-        <div class="gesture-item" id="g-peace">
-          <span class="gesture-icon">✌️</span>
-          <div class="gesture-name">PEACE</div>
-          <div class="gesture-action">Orbit Mode</div>
-        </div>
-        <div class="gesture-item" id="g-ok">
-          <span class="gesture-icon">👌</span>
-          <div class="gesture-name">OK</div>
-          <div class="gesture-action">Color Cycle</div>
-        </div>
-        <div class="gesture-item" id="g-thumb">
-          <span class="gesture-icon">👍</span>
-          <div class="gesture-name">THUMBS UP</div>
-          <div class="gesture-action">Freeze All</div>
-        </div>
-        <div class="gesture-item" id="g-rotate">
-          <span class="gesture-icon">🔄</span>
-          <div class="gesture-name">ROTATE</div>
-          <div class="gesture-action">Spin Scene</div>
-        </div>
+    <div class="glass pad14">
+      <div class="ptitle">✦ GESTURES</div>
+      <div class="g-grid">
+        <div class="g-item" id="g-pinch"><span class="g-icon">🤏</span><div class="g-name">PINCH</div><div class="g-act">Spawn</div></div>
+        <div class="g-item" id="g-open"><span class="g-icon">🖐️</span><div class="g-name">OPEN</div><div class="g-act">Explode</div></div>
+        <div class="g-item" id="g-point"><span class="g-icon">☝️</span><div class="g-name">POINT</div><div class="g-act">Swirl</div></div>
+        <div class="g-item" id="g-fist"><span class="g-icon">✊</span><div class="g-name">FIST</div><div class="g-act">Pull</div></div>
+        <div class="g-item" id="g-peace"><span class="g-icon">✌️</span><div class="g-name">PEACE</div><div class="g-act">Orbit</div></div>
+        <div class="g-item" id="g-ok"><span class="g-icon">👌</span><div class="g-name">OK</div><div class="g-act">Colours</div></div>
+        <div class="g-item" id="g-thumb"><span class="g-icon">👍</span><div class="g-name">THUMBS UP</div><div class="g-act">Freeze</div></div>
+        <div class="g-item" id="g-horns"><span class="g-icon">🤘</span><div class="g-name">HORNS</div><div class="g-act">Galaxy</div></div>
       </div>
     </div>
 
-    <!-- Controls -->
-    <div class="glass" id="controls-card">
-      <div class="panel-title">✦ Parameters</div>
-
-      <div class="control-row">
-        <div class="control-label">PARTICLE COUNT <span class="control-val" id="val-count">800</span></div>
-        <input type="range" id="sl-count" min="100" max="3000" value="800" step="100">
-      </div>
-      <div class="control-row">
-        <div class="control-label">PARTICLE SIZE <span class="control-val" id="val-size">2.5</span></div>
-        <input type="range" id="sl-size" min="0.5" max="8" value="2.5" step="0.5">
-      </div>
-      <div class="control-row">
-        <div class="control-label">SPEED <span class="control-val" id="val-speed">1.0</span></div>
-        <input type="range" id="sl-speed" min="0.1" max="5" value="1" step="0.1">
-      </div>
-      <div class="control-row">
-        <div class="control-label">TRAIL LENGTH <span class="control-val" id="val-trail">0.92</span></div>
-        <input type="range" id="sl-trail" min="0.7" max="0.99" value="0.92" step="0.01">
-      </div>
-      <div class="control-row">
-        <div class="control-label">GRAVITY <span class="control-val" id="val-gravity">0.0</span></div>
-        <input type="range" id="sl-gravity" min="-2" max="2" value="0" step="0.1">
-      </div>
-      <div class="control-row">
-        <div class="control-label">TURBULENCE <span class="control-val" id="val-turb">0.3</span></div>
-        <input type="range" id="sl-turb" min="0" max="2" value="0.3" step="0.05">
-      </div>
+    <div class="glass pad14">
+      <div class="ptitle">✦ PARAMETERS</div>
+      <div class="ctrl-row"><div class="ctrl-label">PARTICLES<span class="ctrl-val" id="v-count">800</span></div><input type="range" id="sl-count" min="100" max="3000" value="800" step="100"></div>
+      <div class="ctrl-row"><div class="ctrl-label">PARTICLE SIZE<span class="ctrl-val" id="v-size">2.5</span></div><input type="range" id="sl-size" min="0.5" max="8" value="2.5" step="0.5"></div>
+      <div class="ctrl-row"><div class="ctrl-label">SPEED<span class="ctrl-val" id="v-speed">1.0</span></div><input type="range" id="sl-speed" min="0.1" max="5" value="1" step="0.1"></div>
+      <div class="ctrl-row"><div class="ctrl-label">TRAIL<span class="ctrl-val" id="v-trail">0.92</span></div><input type="range" id="sl-trail" min="0.7" max="0.99" value="0.92" step="0.01"></div>
+      <div class="ctrl-row"><div class="ctrl-label">GRAVITY<span class="ctrl-val" id="v-gravity">0.0</span></div><input type="range" id="sl-gravity" min="-2" max="2" value="0" step="0.1"></div>
+      <div class="ctrl-row"><div class="ctrl-label">TURBULENCE<span class="ctrl-val" id="v-turb">0.30</span></div><input type="range" id="sl-turb" min="0" max="2" value="0.3" step="0.05"></div>
     </div>
 
-    <!-- Presets -->
-    <div class="glass" id="presets-card">
-      <div class="panel-title">✦ Formations</div>
-      <div class="preset-grid">
-        <button class="preset-btn active" data-preset="scatter" onclick="setPreset('scatter')">SCATTER</button>
-        <button class="preset-btn" data-preset="sphere" onclick="setPreset('sphere')">SPHERE</button>
-        <button class="preset-btn" data-preset="helix" onclick="setPreset('helix')">HELIX</button>
-        <button class="preset-btn" data-preset="galaxy" onclick="setPreset('galaxy')">GALAXY</button>
-        <button class="preset-btn" data-preset="cube" onclick="setPreset('cube')">CUBE</button>
-        <button class="preset-btn" data-preset="torus" onclick="setPreset('torus')">TORUS</button>
-        <button class="preset-btn" data-preset="wave" onclick="setPreset('wave')">WAVE</button>
-        <button class="preset-btn" data-preset="dna" onclick="setPreset('dna')">DNA</button>
+    <div class="glass pad14">
+      <div class="ptitle">✦ FORMATIONS</div>
+      <div class="p-grid">
+        <button class="pbtn active" data-preset="scatter">SCATTER</button>
+        <button class="pbtn" data-preset="sphere">SPHERE</button>
+        <button class="pbtn" data-preset="helix">HELIX</button>
+        <button class="pbtn" data-preset="galaxy">GALAXY</button>
+        <button class="pbtn" data-preset="cube">CUBE</button>
+        <button class="pbtn" data-preset="torus">TORUS</button>
+        <button class="pbtn" data-preset="wave">WAVE</button>
+        <button class="pbtn" data-preset="dna">DNA</button>
       </div>
     </div>
-
   </aside>
 
-  <!-- RIGHT PANEL -->
   <aside id="right-panel">
-
-    <!-- Webcam -->
-    <div class="glass" id="cam-card">
-      <div class="panel-title">✦ Vision Input</div>
-      <div id="cam-wrapper">
+    <div class="glass pad14">
+      <div class="ptitle">✦ VISION INPUT</div>
+      <div id="cam-wrap">
         <video id="webcam" autoplay playsinline muted></video>
         <canvas id="hand-canvas"></canvas>
-        <div class="cam-overlay" id="cam-overlay-text">CAMERA INACTIVE</div>
+        <div id="cam-label">CAMERA INACTIVE</div>
       </div>
     </div>
 
-    <!-- Color Palette -->
-    <div class="glass" id="color-card">
-      <div class="panel-title">✦ Colour Palette</div>
-      <div class="color-grid" id="color-grid"></div>
+    <div class="glass pad14">
+      <div class="ptitle">✦ COLOUR PALETTE</div>
+      <div class="c-grid" id="color-grid"></div>
     </div>
 
-    <!-- Stats -->
-    <div class="glass" id="stats-card">
-      <div class="panel-title">✦ Live Stats</div>
-      <div class="stat-row"><span class="stat-label">PARTICLES</span><span class="stat-val" id="stat-particles">0</span></div>
-      <div class="stat-row"><span class="stat-label">GESTURE</span><span class="stat-val" id="stat-gesture">—</span></div>
-      <div class="stat-row"><span class="stat-label">HAND CONF.</span><span class="stat-val" id="stat-conf">—</span></div>
-      <div class="stat-row"><span class="stat-label">HAND POS.</span><span class="stat-val" id="stat-pos">—</span></div>
-      <div class="stat-row"><span class="stat-label">MODE</span><span class="stat-val" id="stat-mode">SCATTER</span></div>
-      <div class="stat-row"><span class="stat-label">FROZEN</span><span class="stat-val" id="stat-frozen">NO</span></div>
+    <div class="glass pad14">
+      <div class="ptitle">✦ LIVE STATS</div>
+      <div class="srow"><span class="slbl">PARTICLES</span><span class="sval" id="st-parts">800</span></div>
+      <div class="srow"><span class="slbl">GESTURE</span><span class="sval" id="st-gest">—</span></div>
+      <div class="srow"><span class="slbl">CONFIDENCE</span><span class="sval" id="st-conf">—</span></div>
+      <div class="srow"><span class="slbl">HAND POS</span><span class="sval" id="st-pos">—</span></div>
+      <div class="srow"><span class="slbl">FORMATION</span><span class="sval" id="st-mode">SCATTER</span></div>
+      <div class="srow"><span class="slbl">FROZEN</span><span class="sval" id="st-frozen">NO</span></div>
+      <div class="srow"><span class="slbl">MP STATUS</span><span class="sval" id="st-mp">STANDBY</span></div>
     </div>
-
   </aside>
 
-  <!-- BOTTOM BAR -->
   <div id="bottom-bar">
-    <button class="action-btn primary" onclick="toggleCamera()">
-      <span class="icon">📷</span> START CAMERA
-    </button>
-    <button class="action-btn" onclick="explodeAll()">
-      <span class="icon">💥</span> EXPLODE
-    </button>
-    <button class="action-btn" onclick="morphToPreset(currentPreset)">
-      <span class="icon">🔮</span> REFORM
-    </button>
-    <button class="action-btn" onclick="toggleFreeze()">
-      <span class="icon">❄️</span> FREEZE
-    </button>
-    <button class="action-btn" onclick="cycleColorScheme()">
-      <span class="icon">🎨</span> COLOURS
-    </button>
-    <button class="action-btn" onclick="captureScene()">
-      <span class="icon">📸</span> CAPTURE
-    </button>
-    <button class="action-btn danger" onclick="clearScene()">
-      <span class="icon">🗑</span> CLEAR
-    </button>
+    <button class="abtn primary" id="btn-cam">📷 START CAMERA</button>
+    <button class="abtn" id="btn-explode">💥 EXPLODE</button>
+    <button class="abtn" id="btn-reform">🔮 REFORM</button>
+    <button class="abtn" id="btn-freeze">❄️ FREEZE</button>
+    <button class="abtn" id="btn-color">🎨 COLOURS</button>
+    <button class="abtn" id="btn-capture">📸 CAPTURE</button>
+    <button class="abtn danger" id="btn-clear">🗑 CLEAR</button>
   </div>
 
 </div>
 
-<!-- Hidden screenshot canvas -->
-<canvas id="screenshot-canvas" style="display:none"></canvas>
-
 <script>
-// ==============================
-// GLOBALS
-// ==============================
-let scene, camera, renderer, particles, particlePositions, particleVelocities;
-let particleColors, particleSizes;
-let frameCount = 0, lastFpsTime = 0, fps = 0;
-let isFrozen = false;
-let cameraActive = false;
-let currentPreset = 'scatter';
-let handPresent = false;
-let currentGesture = 'none';
-let lastGesture = 'none';
-let gestureTimer = 0;
-let handX = 0.5, handY = 0.5;
-let handZ = 0;
-let pinchStrength = 0;
-let orbitMode = false;
-let autoRotate = true;
+(function(){
+'use strict';
 
-// Params
-let params = {
-  count: 800,
-  size: 2.5,
-  speed: 1.0,
-  trail: 0.92,
-  gravity: 0.0,
-  turbulence: 0.3
-};
+// ─── STATE ────────────────────────────────────────────────
+var scene, cam3, rend, ptMesh;
+var pPos=[], pVel=[], pCol=[];
+var params={ count:800, size:2.5, speed:1.0, trail:0.92, gravity:0.0, turbulence:0.3 };
+var frozen=false, camOn=false, mpReady=false;
+var curPreset='scatter';
+var curGesture='none', prevGesture='';
+var handOn=false, hx=0.5, hy=0.5;
+var palIdx=0, morphTID=null;
+var rotY=0, t3d=0, fc=0, fpsT=0;
+var vidStream=null;
+var gdebounce={};
 
-// Color palettes
-const palettes = [
+var PALS=[
   ['#b4dcff','#c8b4ff','#b4ffe0','#ffd1b4','#ffc4e0'],
   ['#00d4ff','#7b2fff','#00ff9d','#ff6b35','#ff2d87'],
   ['#ffffff','#e0e0ff','#c0d8ff','#a0f0ff','#b0ffee'],
   ['#ff9966','#ff7eb3','#ffd166','#06d6a0','#118ab2'],
   ['#f72585','#7209b7','#3a0ca3','#4361ee','#4cc9f0'],
-  ['#2d6a4f','#40916c','#52b788','#74c69d','#b7e4c7'],
 ];
-let currentPalette = 0;
-let selectedColor = '#b4dcff';
 
-// ==============================
-// LOADING
-// ==============================
-const loadingStatus = document.getElementById('loading-status');
-const loadingMessages = [
-  'Initializing MediaPipe...',
-  'Loading Three.js renderer...',
-  'Calibrating hand tracking...',
-  'Building particle system...',
-  'Almost ready...'
-];
-let msgIdx = 0;
-const msgInterval = setInterval(() => {
-  if (msgIdx < loadingMessages.length) {
-    loadingStatus.textContent = loadingMessages[msgIdx++];
-  }
-}, 500);
-
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    clearInterval(msgInterval);
-    document.getElementById('loading').classList.add('fade');
-    showNotif('Welcome to AETHER — Start Camera to begin sculpting');
-  }, 2800);
+// ─── LOADING ──────────────────────────────────────────────
+var ldBar=document.getElementById('ld-bar');
+var ldStatus=document.getElementById('ld-status');
+var msgs=['Initialising Three.js...','Building particle system...','Preparing shaders...','Setting up gestures...','Ready!'];
+var mi=0;
+var ldInt=setInterval(function(){
+  if(mi<msgs.length){ ldStatus.textContent=msgs[mi]; ldBar.style.width=((mi+1)/msgs.length*100)+'%'; mi++; }
+},480);
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    clearInterval(ldInt); ldBar.style.width='100%';
+    setTimeout(function(){
+      document.getElementById('loading').classList.add('gone');
+      notify('Welcome — click START CAMERA or use mouse to sculpt');
+    },300);
+  },2500);
 });
 
-// ==============================
-// THREE.JS SETUP
-// ==============================
-function initThree() {
-  scene = new THREE.Scene();
-  
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-  camera.position.z = 300;
-
-  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x050810, 1);
-
-  // Ambient fog
-  scene.fog = new THREE.FogExp2(0x050810, 0.0008);
-
-  initParticles();
-  initLights();
-  animate();
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+// ─── THREE.JS ─────────────────────────────────────────────
+function initThree(){
+  scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x050810,0.0007);
+  cam3=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,2000);
+  cam3.position.z=320;
+  rend=new THREE.WebGLRenderer({canvas:document.getElementById('bg-canvas'),antialias:true,preserveDrawingBuffer:true});
+  rend.setSize(innerWidth,innerHeight);
+  rend.setPixelRatio(Math.min(devicePixelRatio,2));
+  rend.setClearColor(0x050810,1);
+  buildParticles();
+  window.addEventListener('resize',function(){
+    cam3.aspect=innerWidth/innerHeight; cam3.updateProjectionMatrix();
+    rend.setSize(innerWidth,innerHeight);
   });
+  loop();
 }
 
-// ==============================
-// PARTICLE SYSTEM
-// ==============================
-function initParticles() {
-  if (particles) { scene.remove(particles); particles.geometry.dispose(); particles.material.dispose(); }
-
-  const count = params.count;
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
-
-  particlePositions = new Array(count).fill(0).map(() => ({
-    x: (Math.random() - 0.5) * 400,
-    y: (Math.random() - 0.5) * 400,
-    z: (Math.random() - 0.5) * 200
-  }));
-
-  particleVelocities = new Array(count).fill(0).map(() => ({
-    x: (Math.random() - 0.5) * 0.5,
-    y: (Math.random() - 0.5) * 0.5,
-    z: (Math.random() - 0.5) * 0.2
-  }));
-
-  particleColors = new Array(count);
-  particleSizes = new Array(count);
-
-  for (let i = 0; i < count; i++) {
-    const col = hexToRgb(palettes[currentPalette][i % palettes[currentPalette].length]);
-    particleColors[i] = col;
-    particleSizes[i] = params.size * (0.5 + Math.random() * 1.0);
-    sizes[i] = particleSizes[i];
-    colors[i*3] = col.r/255; colors[i*3+1] = col.g/255; colors[i*3+2] = col.b/255;
-    positions[i*3] = particlePositions[i].x;
-    positions[i*3+1] = particlePositions[i].y;
-    positions[i*3+2] = particlePositions[i].z;
+function buildParticles(){
+  if(ptMesh){ scene.remove(ptMesh); ptMesh.geometry.dispose(); ptMesh.material.dispose(); }
+  var n=params.count;
+  var pa=new Float32Array(n*3), ca=new Float32Array(n*3), sa=new Float32Array(n);
+  pPos=[]; pVel=[]; pCol=[];
+  for(var i=0;i<n;i++){
+    pPos.push({x:(Math.random()-.5)*420,y:(Math.random()-.5)*420,z:(Math.random()-.5)*200});
+    pVel.push({x:(Math.random()-.5)*.5,y:(Math.random()-.5)*.5,z:(Math.random()-.5)*.2});
+    var c=h2r(PALS[palIdx][i%PALS[palIdx].length]);
+    pCol.push(c);
+    ca[i*3]=c.r/255; ca[i*3+1]=c.g/255; ca[i*3+2]=c.b/255;
+    pa[i*3]=pPos[i].x; pa[i*3+1]=pPos[i].y; pa[i*3+2]=pPos[i].z;
+    sa[i]=params.size*(0.5+Math.random());
   }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      time: { value: 0 },
-      pixelRatio: { value: renderer.getPixelRatio() }
-    },
-    vertexShader: `
-      attribute float size;
-      attribute vec3 color;
-      varying vec3 vColor;
-      varying float vAlpha;
-      uniform float time;
-      void main() {
-        vColor = color;
-        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * (300.0 / -mvPos.z);
-        gl_Position = projectionMatrix * mvPos;
-        vAlpha = clamp(1.0 + mvPos.z / 500.0, 0.2, 1.0);
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vColor;
-      varying float vAlpha;
-      void main() {
-        vec2 uv = gl_PointCoord - 0.5;
-        float d = length(uv);
-        if (d > 0.5) discard;
-        float alpha = smoothstep(0.5, 0.1, d);
-        float glow = smoothstep(0.5, 0.0, d) * 0.4;
-        gl_FragColor = vec4(vColor + glow, alpha * vAlpha * 0.85);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    vertexColors: true,
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pa,3));
+  g.setAttribute('color',new THREE.BufferAttribute(ca,3));
+  g.setAttribute('size',new THREE.BufferAttribute(sa,1));
+  var m=new THREE.ShaderMaterial({
+    uniforms:{time:{value:0}},
+    vertexShader:[
+      'attribute float size;','attribute vec3 color;','varying vec3 vC;','varying float vA;',
+      'void main(){vC=color;vec4 mv=modelViewMatrix*vec4(position,1.0);',
+      'gl_PointSize=size*(280.0/-mv.z);gl_Position=projectionMatrix*mv;',
+      'vA=clamp(1.0+mv.z/400.0,0.15,1.0);}'
+    ].join('\n'),
+    fragmentShader:[
+      'varying vec3 vC;','varying float vA;',
+      'void main(){vec2 uv=gl_PointCoord-.5;float d=length(uv);',
+      'if(d>.5)discard;float a=smoothstep(.5,.05,d);float gw=smoothstep(.5,.0,d)*.35;',
+      'gl_FragColor=vec4(vC+gw,a*vA*.88);}'
+    ].join('\n'),
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true
   });
-
-  particles = new THREE.Points(geometry, material);
-  scene.add(particles);
-
-  document.getElementById('stat-particles').textContent = count;
+  ptMesh=new THREE.Points(g,m);
+  scene.add(ptMesh);
+  document.getElementById('st-parts').textContent=n;
 }
 
-function initLights() {
-  const ambient = new THREE.AmbientLight(0x304060, 0.3);
-  scene.add(ambient);
+function loop(){
+  requestAnimationFrame(loop);
+  t3d+=0.01; fc++;
+  var now=performance.now();
+  if(now-fpsT>1000){ document.getElementById('fps-num').textContent=Math.round(fc*1000/(now-fpsT)); fc=0; fpsT=now; }
+  if(!frozen) tick();
+  rotY+=0.0008;
+  ptMesh.rotation.y+=(rotY-ptMesh.rotation.y)*0.04;
+  ptMesh.material.uniforms.time.value=t3d;
+  rend.render(scene,cam3);
 }
 
-// ==============================
-// ANIMATION LOOP
-// ==============================
-let sceneRotY = 0;
-let targetRotY = 0;
-let time = 0;
-
-function animate() {
-  requestAnimationFrame(animate);
-  time += 0.01;
-
-  // FPS counter
-  frameCount++;
-  const now = performance.now();
-  if (now - lastFpsTime > 1000) {
-    fps = Math.round(frameCount * 1000 / (now - lastFpsTime));
-    document.getElementById('fps-val').textContent = fps;
-    frameCount = 0;
-    lastFpsTime = now;
-  }
-
-  if (!isFrozen) {
-    updateParticles();
-  }
-
-  // Auto-rotate
-  if (autoRotate && !orbitMode) {
-    sceneRotY += 0.001;
-  }
-
-  particles.rotation.y += (sceneRotY - particles.rotation.y) * 0.05;
-  if (particles.material.uniforms) {
-    particles.material.uniforms.time.value = time;
-  }
-
-  renderer.render(scene, camera);
-}
-
-function updateParticles() {
-  const count = params.count;
-  const positions = particles.geometry.attributes.position.array;
-  const colors = particles.geometry.attributes.color.array;
-  const sizes = particles.geometry.attributes.size.array;
-
-  const hx = (handX - 0.5) * 400;
-  const hy = -(handY - 0.5) * 400;
-
-  for (let i = 0; i < count; i++) {
-    const p = particlePositions[i];
-    const v = particleVelocities[i];
-
-    // Turbulence
-    const t = params.turbulence;
-    v.x += (Math.random() - 0.5) * t * 0.1;
-    v.y += (Math.random() - 0.5) * t * 0.1;
-    v.z += (Math.random() - 0.5) * t * 0.05;
-
-    // Gravity
-    v.y += params.gravity * 0.01;
-
-    // Hand interaction
-    if (handPresent) {
-      const dx = hx - p.x;
-      const dy = hy - p.y;
-      const dist = Math.sqrt(dx*dx + dy*dy) + 0.001;
-
-      if (currentGesture === 'point' || currentGesture === 'swirl') {
-        // Attract + swirl
-        const force = 15 / (dist * dist + 100);
-        v.x += dx * force;
-        v.y += dy * force;
-        // Perpendicular swirl
-        v.x += (-dy / dist) * 0.2;
-        v.y += (dx / dist) * 0.2;
-      }
-
-      if (currentGesture === 'fist') {
-        // Strong gravity pull
-        const force = 50 / (dist * dist + 50);
-        v.x += dx * force;
-        v.y += dy * force;
-      }
-
-      if (currentGesture === 'open') {
-        // Repel
-        if (dist < 120) {
-          const force = 30 / (dist + 1);
-          v.x -= dx * force * 0.01;
-          v.y -= dy * force * 0.01;
-        }
-      }
-
-      if (currentGesture === 'peace') {
-        // Orbit
-        const angle = Math.atan2(dy, dx);
-        const orbitR = 80;
-        const orbitDx = Math.cos(angle + Math.PI/2) * orbitR - p.x + hx;
-        const orbitDy = Math.sin(angle + Math.PI/2) * orbitR - p.y + hy;
-        v.x += orbitDx * 0.002;
-        v.y += orbitDy * 0.002;
-      }
-
-      if (currentGesture === 'pinch') {
-        // Spawn particles at hand
-        if (i % 15 === 0) {
-          p.x = hx + (Math.random() - 0.5) * 30;
-          p.y = hy + (Math.random() - 0.5) * 30;
-          p.z = (Math.random() - 0.5) * 50;
-          v.x = (Math.random() - 0.5) * 2;
-          v.y = (Math.random() - 0.5) * 2;
-          v.z = (Math.random() - 0.5) * 1;
-        }
-      }
+function tick(){
+  var n=params.count, pa=ptMesh.geometry.attributes.position.array;
+  var wx=(hx-.5)*400, wy=-(hy-.5)*400;
+  for(var i=0;i<n;i++){
+    var p=pPos[i],v=pVel[i];
+    var tb=params.turbulence;
+    v.x+=(Math.random()-.5)*tb*.1; v.y+=(Math.random()-.5)*tb*.1; v.z+=(Math.random()-.5)*tb*.05;
+    v.y+=params.gravity*.008;
+    if(handOn){
+      var dx=wx-p.x, dy=wy-p.y, di=Math.sqrt(dx*dx+dy*dy)+.001;
+      if(curGesture==='point'){ var f=12/(di*di+80); v.x+=dx*f; v.y+=dy*f; v.x+=(-dy/di)*.18; v.y+=(dx/di)*.18; }
+      if(curGesture==='fist'){ var f=40/(di*di+40); v.x+=dx*f; v.y+=dy*f; }
+      if(curGesture==='open'&&di<130){ var f=25/(di+1); v.x-=dx*f*.01; v.y-=dy*f*.01; }
+      if(curGesture==='peace'){ var ang=Math.atan2(dy,dx); v.x+=(Math.cos(ang+1.5708)*90-p.x+wx)*.002; v.y+=(Math.sin(ang+1.5708)*90-p.y+wy)*.002; }
+      if(curGesture==='pinch'&&i%12===0){ p.x=wx+(Math.random()-.5)*35; p.y=wy+(Math.random()-.5)*35; p.z=(Math.random()-.5)*50; v.x=(Math.random()-.5)*2; v.y=(Math.random()-.5)*2; v.z=(Math.random()-.5); }
     }
-
-    // Speed limiting
-    const speed = params.speed;
-    const mag = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-    if (mag > speed * 5) {
-      v.x *= (speed * 5) / mag;
-      v.y *= (speed * 5) / mag;
-      v.z *= (speed * 5) / mag;
-    }
-
-    // Dampen
-    v.x *= params.trail;
-    v.y *= params.trail;
-    v.z *= params.trail;
-
-    // Update position
-    p.x += v.x * params.speed;
-    p.y += v.y * params.speed;
-    p.z += v.z * params.speed;
-
-    // Boundary wrap
-    if (p.x > 250) p.x = -250;
-    if (p.x < -250) p.x = 250;
-    if (p.y > 250) p.y = -250;
-    if (p.y < -250) p.y = 250;
-    if (p.z > 150) p.z = -150;
-    if (p.z < -150) p.z = 150;
-
-    positions[i*3] = p.x;
-    positions[i*3+1] = p.y;
-    positions[i*3+2] = p.z;
+    var mg=Math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z), mx=params.speed*5;
+    if(mg>mx){ v.x*=mx/mg; v.y*=mx/mg; v.z*=mx/mg; }
+    v.x*=params.trail; v.y*=params.trail; v.z*=params.trail;
+    p.x+=v.x*params.speed; p.y+=v.y*params.speed; p.z+=v.z*params.speed;
+    if(p.x>260)p.x=-260; if(p.x<-260)p.x=260;
+    if(p.y>260)p.y=-260; if(p.y<-260)p.y=260;
+    if(p.z>160)p.z=-160; if(p.z<-160)p.z=160;
+    pa[i*3]=p.x; pa[i*3+1]=p.y; pa[i*3+2]=p.z;
   }
-
-  particles.geometry.attributes.position.needsUpdate = true;
+  ptMesh.geometry.attributes.position.needsUpdate=true;
 }
 
-// ==============================
-// PRESETS / MORPHING
-// ==============================
-let morphTargets = null;
-let morphProgress = 0;
-let morphing = false;
-
-const presetFunctions = {
-  scatter: (i, count) => ({
-    x: (Math.random() - 0.5) * 400,
-    y: (Math.random() - 0.5) * 400,
-    z: (Math.random() - 0.5) * 200
-  }),
-  sphere: (i, count) => {
-    const phi = Math.acos(-1 + (2 * i) / count);
-    const theta = Math.sqrt(count * Math.PI) * phi;
-    return { x: 120 * Math.cos(theta) * Math.sin(phi), y: 120 * Math.sin(theta) * Math.sin(phi), z: 120 * Math.cos(phi) };
-  },
-  helix: (i, count) => {
-    const t = (i / count) * Math.PI * 8;
-    return { x: Math.cos(t) * 100, y: (i / count - 0.5) * 400, z: Math.sin(t) * 100 };
-  },
-  galaxy: (i, count) => {
-    const r = 20 + (i / count) * 200;
-    const angle = i * 0.2 + r * 0.01;
-    const spiral = i * 0.008;
-    return { x: Math.cos(angle + spiral) * r, y: (Math.random() - 0.5) * 20, z: Math.sin(angle + spiral) * r };
-  },
-  cube: (i, count) => {
-    const side = Math.floor(Math.cbrt(count));
-    const x = (i % side - side/2) * 10;
-    const y = (Math.floor(i / side) % side - side/2) * 10;
-    const z = (Math.floor(i / side / side) - side/2) * 10;
-    return { x, y, z };
-  },
-  torus: (i, count) => {
-    const u = (i / count) * Math.PI * 2;
-    const v = (i * 7.93) % (Math.PI * 2);
-    const R = 120, r = 40;
-    return { x: (R + r * Math.cos(v)) * Math.cos(u), y: (R + r * Math.cos(v)) * Math.sin(u), z: r * Math.sin(v) };
-  },
-  wave: (i, count) => {
-    const cols = Math.ceil(Math.sqrt(count));
-    const x = (i % cols - cols/2) * 8;
-    const z = (Math.floor(i / cols) - cols/2) * 8;
-    const y = Math.sin(x * 0.05 + z * 0.05) * 60;
-    return { x, y, z };
-  },
-  dna: (i, count) => {
-    const t = (i / count) * Math.PI * 10;
-    const strand = i % 2;
-    const offset = strand * Math.PI;
-    return { x: Math.cos(t + offset) * 60, y: (i / count - 0.5) * 400, z: Math.sin(t + offset) * 60 };
-  }
+// ─── PRESETS ──────────────────────────────────────────────
+var PSETS={
+  scatter:function(i,n){return{x:(Math.random()-.5)*420,y:(Math.random()-.5)*420,z:(Math.random()-.5)*200};},
+  sphere:function(i,n){var phi=Math.acos(-1+(2*i)/n),theta=Math.sqrt(n*Math.PI)*phi;return{x:130*Math.cos(theta)*Math.sin(phi),y:130*Math.sin(theta)*Math.sin(phi),z:130*Math.cos(phi)};},
+  helix:function(i,n){var t=(i/n)*Math.PI*8;return{x:Math.cos(t)*100,y:(i/n-.5)*420,z:Math.sin(t)*100};},
+  galaxy:function(i,n){var r=20+(i/n)*210,a=i*.2+r*.01,s=i*.008;return{x:Math.cos(a+s)*r,y:(Math.random()-.5)*25,z:Math.sin(a+s)*r};},
+  cube:function(i,n){var s=Math.floor(Math.cbrt(n));return{x:(i%s-s/2)*11,y:(Math.floor(i/s)%s-s/2)*11,z:(Math.floor(i/s/s)-s/2)*11};},
+  torus:function(i,n){var u=(i/n)*Math.PI*2,v=(i*7.93)%(Math.PI*2);return{x:(120+42*Math.cos(v))*Math.cos(u),y:(120+42*Math.cos(v))*Math.sin(u),z:42*Math.sin(v)};},
+  wave:function(i,n){var c=Math.ceil(Math.sqrt(n)),x=(i%c-c/2)*9,z=(Math.floor(i/c)-c/2)*9;return{x:x,y:Math.sin(x*.05+z*.05)*65,z:z};},
+  dna:function(i,n){var t=(i/n)*Math.PI*10,o=(i%2)*Math.PI;return{x:Math.cos(t+o)*65,y:(i/n-.5)*420,z:Math.sin(t+o)*65};}
 };
 
-function setPreset(name) {
-  currentPreset = name;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
-  document.getElementById('stat-mode').textContent = name.toUpperCase();
-  morphToPreset(name);
-  showNotif(`Formation: ${name.toUpperCase()}`);
+function applyPreset(name){
+  curPreset=name;
+  document.querySelectorAll('.pbtn').forEach(function(b){b.classList.toggle('active',b.dataset.preset===name);});
+  document.getElementById('st-mode').textContent=name.toUpperCase();
+  morphTo(name);
+  notify('Formation: '+name.toUpperCase());
 }
 
-function morphToPreset(name) {
-  const fn = presetFunctions[name] || presetFunctions.scatter;
-  const count = params.count;
-  morphTargets = new Array(count).fill(0).map((_, i) => fn(i, count));
-  morphProgress = 0;
-  morphing = true;
-
-  const interval = setInterval(() => {
-    if (morphProgress >= 1) { clearInterval(interval); morphing = false; return; }
-    morphProgress = Math.min(1, morphProgress + 0.02);
-    const ease = 1 - Math.pow(1 - morphProgress, 3);
-    for (let i = 0; i < count; i++) {
-      const p = particlePositions[i];
-      const t = morphTargets[i];
-      p.x += (t.x - p.x) * ease * 0.08;
-      p.y += (t.y - p.y) * ease * 0.08;
-      p.z += (t.z - p.z) * ease * 0.08;
-      particleVelocities[i] = { x: 0, y: 0, z: 0 };
+function morphTo(name){
+  if(morphTID) clearInterval(morphTID);
+  var fn=PSETS[name]||PSETS.scatter, n=params.count, targets=[];
+  for(var i=0;i<n;i++) targets.push(fn(i,n));
+  var prog=0;
+  morphTID=setInterval(function(){
+    prog=Math.min(1,prog+0.025);
+    var ease=1-Math.pow(1-prog,3);
+    for(var i=0;i<n;i++){
+      var p=pPos[i],tg=targets[i];
+      p.x+=(tg.x-p.x)*ease*.12; p.y+=(tg.y-p.y)*ease*.12; p.z+=(tg.z-p.z)*ease*.12;
+      pVel[i].x=0; pVel[i].y=0; pVel[i].z=0;
     }
-  }, 16);
+    if(prog>=1) clearInterval(morphTID);
+  },16);
 }
 
-// ==============================
-// SCENE ACTIONS
-// ==============================
-function explodeAll() {
-  const count = params.count;
-  for (let i = 0; i < count; i++) {
-    const v = particleVelocities[i];
-    v.x += (Math.random() - 0.5) * 20;
-    v.y += (Math.random() - 0.5) * 20;
-    v.z += (Math.random() - 0.5) * 10;
+// ─── ACTIONS ──────────────────────────────────────────────
+function doExplode(){
+  for(var i=0;i<params.count;i++){
+    pVel[i].x+=(Math.random()-.5)*24;
+    pVel[i].y+=(Math.random()-.5)*24;
+    pVel[i].z+=(Math.random()-.5)*12;
   }
-  showNotif('💥 EXPLODE');
+  showTooltip('💥','EXPLODE'); notify('💥 Boom!');
 }
 
-function clearScene() {
-  const count = params.count;
-  for (let i = 0; i < count; i++) {
-    particlePositions[i] = { x: 0, y: 0, z: 0 };
-    particleVelocities[i] = {
-      x: (Math.random() - 0.5) * 3,
-      y: (Math.random() - 0.5) * 3,
-      z: (Math.random() - 0.5) * 3
-    };
+function doClear(){
+  for(var i=0;i<params.count;i++){
+    pPos[i]={x:0,y:0,z:0};
+    pVel[i]={x:(Math.random()-.5)*4,y:(Math.random()-.5)*4,z:(Math.random()-.5)*2};
   }
-  showNotif('Scene cleared');
+  notify('Scene cleared');
 }
 
-let freezeState = false;
-function toggleFreeze() {
-  freezeState = !freezeState;
-  isFrozen = freezeState;
-  document.getElementById('stat-frozen').textContent = freezeState ? 'YES' : 'NO';
-  showNotif(freezeState ? '❄️ FROZEN' : '▶ UNFROZEN');
+function doFreeze(){
+  frozen=!frozen;
+  document.getElementById('st-frozen').textContent=frozen?'YES':'NO';
+  document.getElementById('btn-freeze').textContent=(frozen?'▶ UNFREEZE':'❄️ FREEZE');
+  showTooltip(frozen?'❄️':'▶',frozen?'FROZEN':'UNFROZEN');
+  notify(frozen?'❄️ Frozen':'▶ Unfrozen');
 }
 
-function cycleColorScheme() {
-  currentPalette = (currentPalette + 1) % palettes.length;
-  const count = params.count;
-  const colors = particles.geometry.attributes.color.array;
-  for (let i = 0; i < count; i++) {
-    const col = hexToRgb(palettes[currentPalette][i % palettes[currentPalette].length]);
-    particleColors[i] = col;
-    colors[i*3] = col.r/255; colors[i*3+1] = col.g/255; colors[i*3+2] = col.b/255;
+function doCycleColor(){
+  palIdx=(palIdx+1)%PALS.length;
+  var n=params.count, ca=ptMesh.geometry.attributes.color.array;
+  for(var i=0;i<n;i++){
+    var c=h2r(PALS[palIdx][i%PALS[palIdx].length]);
+    pCol[i]=c; ca[i*3]=c.r/255; ca[i*3+1]=c.g/255; ca[i*3+2]=c.b/255;
   }
-  particles.geometry.attributes.color.needsUpdate = true;
+  ptMesh.geometry.attributes.color.needsUpdate=true;
   buildColorGrid();
-  showNotif('Colour scheme changed');
+  showTooltip('🎨','COLOUR CYCLE'); notify('Colour scheme updated');
 }
 
-function captureScene() {
-  renderer.render(scene, camera);
-  const link = document.createElement('a');
-  link.download = 'aether-capture.png';
-  link.href = renderer.domElement.toDataURL();
-  link.click();
-  showNotif('📸 Captured!');
+function doCapture(){
+  try{
+    rend.render(scene,cam3);
+    var a=document.createElement('a');
+    a.download='aether-'+Date.now()+'.png';
+    a.href=rend.domElement.toDataURL('image/png');
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    notify('📸 Screenshot saved!');
+  }catch(e){ notify('Capture failed: '+e.message); }
 }
 
-// ==============================
-// COLOR GRID
-// ==============================
-function buildColorGrid() {
-  const grid = document.getElementById('color-grid');
-  grid.innerHTML = '';
-  const pal = palettes[currentPalette];
-  [...pal, ...palettes[(currentPalette+1)%palettes.length]].slice(0,10).forEach(hex => {
-    const sw = document.createElement('div');
-    sw.className = 'color-swatch' + (hex === selectedColor ? ' active' : '');
-    sw.style.background = hex;
-    sw.onclick = () => {
-      selectedColor = hex;
-      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-      sw.classList.add('active');
-      // Apply to subset of particles
-      const col = hexToRgb(hex);
-      const colors = particles.geometry.attributes.color.array;
-      const count = params.count;
-      for (let i = 0; i < count; i += 3) {
-        colors[i*3] = col.r/255; colors[i*3+1] = col.g/255; colors[i*3+2] = col.b/255;
-      }
-      particles.geometry.attributes.color.needsUpdate = true;
+// ─── CAMERA ───────────────────────────────────────────────
+function startCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    showError('NOT SUPPORTED','Camera API not available. Use Chrome/Firefox on HTTPS.');
+    return;
+  }
+  notify('Requesting camera permission...');
+  navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:'user'},audio:false})
+  .then(function(stream){
+    vidStream=stream;
+    var vid=document.getElementById('webcam');
+    vid.srcObject=stream;
+    vid.onloadedmetadata=function(){
+      vid.play().then(function(){
+        camOn=true;
+        document.getElementById('cam-dot').classList.remove('off');
+        document.getElementById('cam-chip').textContent='CAM ON';
+        document.getElementById('cam-label').textContent='HAND TRACKING ACTIVE';
+        document.getElementById('btn-cam').textContent='📷 STOP CAMERA';
+        document.getElementById('cursor-ring').style.display='block';
+        document.getElementById('st-mp').textContent='LOADING MP...';
+        notify('Camera active — loading hand tracking...');
+        loadMP(vid);
+      }).catch(function(e){ showError('PLAY ERROR',e.message); });
     };
-    grid.appendChild(sw);
+  })
+  .catch(function(e){
+    var msg={
+      'NotAllowedError':'Permission denied. Click the camera icon in your browser address bar and allow access, then try again.',
+      'NotFoundError':'No camera found on this device.',
+      'NotReadableError':'Camera is being used by another app. Close it and retry.',
+      'OverconstrainedError':'Camera resolution not supported.',
+      'SecurityError':'Camera blocked by browser security policy (requires HTTPS).'
+    }[e.name]||e.name+': '+e.message;
+    showError('CAMERA BLOCKED', msg);
+    notify('Camera error — check popup');
   });
 }
 
-// ==============================
-// SLIDER CONTROLS
-// ==============================
-function setupSliders() {
-  const sliders = [
-    ['sl-count','val-count','count',1],
-    ['sl-size','val-size','size',1],
-    ['sl-speed','val-speed','speed',1],
-    ['sl-trail','val-trail','trail',2],
-    ['sl-gravity','val-gravity','gravity',1],
-    ['sl-turb','val-turb','turbulence',2],
-  ];
+function stopCamera(){
+  if(vidStream){ vidStream.getTracks().forEach(function(tr){tr.stop();}); vidStream=null; }
+  var vid=document.getElementById('webcam'); vid.srcObject=null;
+  camOn=false; handOn=false; curGesture='none'; mpReady=false;
+  ['cam-dot','hand-dot'].forEach(function(id){document.getElementById(id).classList.add('off');});
+  document.getElementById('cam-chip').textContent='CAM OFF';
+  document.getElementById('hand-chip').textContent='NO HAND';
+  document.getElementById('cam-label').textContent='CAMERA INACTIVE';
+  document.getElementById('btn-cam').textContent='📷 START CAMERA';
+  document.getElementById('cursor-ring').style.display='none';
+  document.getElementById('st-gest').textContent='—';
+  document.getElementById('st-pos').textContent='—';
+  document.getElementById('st-conf').textContent='—';
+  document.getElementById('st-mp').textContent='STANDBY';
+  document.querySelectorAll('.g-item').forEach(function(g){g.classList.remove('active');});
+  notify('Camera stopped');
+}
 
-  sliders.forEach(([id, valId, param, decimals]) => {
-    const el = document.getElementById(id);
-    const valEl = document.getElementById(valId);
-    el.addEventListener('input', () => {
-      const v = parseFloat(el.value);
-      params[param] = v;
-      valEl.textContent = v.toFixed(decimals);
-      if (param === 'count') {
-        initParticles();
-      }
-      if (param === 'size') {
-        const sizes = particles.geometry.attributes.size.array;
-        for (let i = 0; i < params.count; i++) {
-          sizes[i] = v * (0.5 + Math.random());
-        }
-        particles.geometry.attributes.size.needsUpdate = true;
-      }
+// ─── MEDIAPIPE LOADER ────────────────────────────────────
+function loadMP(vid){
+  function loadScript(src,cb,errCb){
+    var s=document.createElement('script');
+    s.src=src; s.crossOrigin='anonymous';
+    s.onload=function(){setTimeout(cb,100);};
+    s.onerror=errCb||function(){notify('Script load failed: '+src);};
+    document.head.appendChild(s);
+  }
+
+  function tryInit(){
+    if(typeof Hands!=='undefined'&&typeof Camera!=='undefined'&&typeof drawConnectors!=='undefined'){
+      initMP(vid);
+    } else {
+      setTimeout(tryInit,400);
+    }
+  }
+
+  if(typeof Hands!=='undefined'&&typeof Camera!=='undefined'){
+    initMP(vid);
+    return;
+  }
+
+  var base='https://cdn.jsdelivr.net/npm/@mediapipe/';
+  loadScript(base+'hands@0.4.1646424915/hands.js',function(){
+    loadScript(base+'camera_utils@0.3.1632717698/camera_utils.js',function(){
+      loadScript(base+'drawing_utils@0.3.1620248257/drawing_utils.js',function(){
+        setTimeout(tryInit,200);
+      });
     });
   });
 }
 
-// ==============================
-// CAMERA / MEDIAPIPE
-// ==============================
-let mediaPipeHands = null;
+function initMP(vid){
+  try{
+    document.getElementById('st-mp').textContent='INIT...';
+    var hands=new Hands({locateFile:function(f){return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/'+f;}});
+    hands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:0.6,minTrackingConfidence:0.5});
+    hands.onResults(onHandResults);
 
-async function toggleCamera() {
-  if (!cameraActive) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
-      const video = document.getElementById('webcam');
-      video.srcObject = stream;
-      await video.play();
-      cameraActive = true;
-      document.querySelector('[onclick="toggleCamera()"]').innerHTML = '<span class="icon">📷</span> STOP CAMERA';
-      document.getElementById('cam-dot').classList.remove('inactive');
-      document.getElementById('cam-status-text').textContent = 'CAMERA ON';
-      document.getElementById('cam-overlay-text').textContent = 'HAND TRACKING ACTIVE';
-      document.getElementById('cursor-ring').style.display = 'block';
-      initMediaPipe(video);
-      showNotif('Camera started — Show your hand!');
-    } catch(e) {
-      showNotif('Camera error: ' + e.message);
-    }
-  } else {
-    const video = document.getElementById('webcam');
-    if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
-    cameraActive = false;
-    handPresent = false;
-    document.querySelector('[onclick="toggleCamera()"]').innerHTML = '<span class="icon">📷</span> START CAMERA';
-    document.getElementById('cam-dot').classList.add('inactive');
-    document.getElementById('cam-status-text').textContent = 'CAMERA OFF';
-    document.getElementById('cam-overlay-text').textContent = 'CAMERA INACTIVE';
-    document.getElementById('cursor-ring').style.display = 'none';
-    updateHandStatus(false);
-    showNotif('Camera stopped');
+    var mpCam=new Camera(vid,{
+      onFrame:function(){return hands.send({image:vid});},
+      width:640,height:480
+    });
+    mpCam.start().then(function(){
+      mpReady=true;
+      document.getElementById('st-mp').textContent='ACTIVE';
+      notify('Hand tracking ready! Show your hand 🖐️');
+    }).catch(function(e){
+      document.getElementById('st-mp').textContent='ERR';
+      notify('MP cam error: '+e.message);
+    });
+  }catch(e){
+    document.getElementById('st-mp').textContent='FAILED';
+    notify('MediaPipe init error: '+e.message);
+    console.error('MP error:',e);
   }
 }
 
-function initMediaPipe(videoEl) {
-  const hands = new Hands({
-    locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-  });
+// ─── HAND RESULTS ─────────────────────────────────────────
+var hCvs=document.getElementById('hand-canvas');
+var hCtx=hCvs.getContext('2d');
 
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.5,
-  });
-
-  hands.onResults(onHandResults);
-
-  const camUtils = new Camera(videoEl, {
-    onFrame: async () => { await hands.send({ image: videoEl }); },
-    width: 640, height: 480
-  });
-  camUtils.start();
-  mediaPipeHands = hands;
-}
-
-const handCanvas = document.getElementById('hand-canvas');
-const handCtx = handCanvas.getContext('2d');
-
-function onHandResults(results) {
-  handCanvas.width = handCanvas.offsetWidth;
-  handCanvas.height = handCanvas.offsetHeight;
-  handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
-
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    const landmarks = results.multiHandLandmarks[0];
-    handPresent = true;
-
-    // Draw landmarks
-    drawConnectors(handCtx, landmarks, HAND_CONNECTIONS, { color: 'rgba(180,220,255,0.4)', lineWidth: 1.5 });
-    drawLandmarks(handCtx, landmarks, { color: 'rgba(180,220,255,0.8)', fillColor: 'rgba(180,220,255,0.3)', lineWidth: 1, radius: 3 });
-
-    // Extract position (wrist = 0)
-    const wrist = landmarks[0];
-    handX = wrist.x;
-    handY = wrist.y;
-
-    // Detect gesture
-    const gesture = detectGesture(landmarks);
-    updateGestureUI(gesture, landmarks);
-    
-    // Update cursor ring
-    const ring = document.getElementById('cursor-ring');
-    const rx = (1 - wrist.x) * window.innerWidth; // mirrored
-    const ry = wrist.y * window.innerHeight;
-    ring.style.left = rx + 'px';
-    ring.style.top = ry + 'px';
-    ring.classList.toggle('pinch', gesture === 'pinch');
-
-    // Stats
-    document.getElementById('stat-gesture').textContent = gesture.toUpperCase();
-    document.getElementById('stat-pos').textContent = `${Math.round(handX*100)}, ${Math.round(handY*100)}`;
-    document.getElementById('stat-conf').textContent = results.multiHandedness ? Math.round(results.multiHandedness[0].score * 100) + '%' : '—';
-    document.getElementById('hand-dot').classList.remove('inactive');
-    document.getElementById('hand-status-text').textContent = 'HAND DETECTED';
-
+function onHandResults(res){
+  hCvs.width=hCvs.offsetWidth||240; hCvs.height=hCvs.offsetHeight||180;
+  hCtx.clearRect(0,0,hCvs.width,hCvs.height);
+  if(res.multiHandLandmarks&&res.multiHandLandmarks.length>0){
+    var lm=res.multiHandLandmarks[0];
+    handOn=true;
+    try{
+      if(typeof drawConnectors!=='undefined'&&typeof HAND_CONNECTIONS!=='undefined'){
+        drawConnectors(hCtx,lm,HAND_CONNECTIONS,{color:'rgba(180,220,255,0.35)',lineWidth:1.5});
+        drawLandmarks(hCtx,lm,{color:'rgba(180,220,255,0.85)',fillColor:'rgba(180,220,255,0.25)',lineWidth:1,radius:2.5});
+      }
+    }catch(e){}
+    hx=lm[0].x; hy=lm[0].y;
+    var g=detectGesture(lm);
+    handleGesture(g,res);
+    var ring=document.getElementById('cursor-ring');
+    ring.style.left=((1-lm[0].x)*innerWidth)+'px';
+    ring.style.top=(lm[0].y*innerHeight)+'px';
+    ring.classList.toggle('pinch',g==='pinch');
+    document.getElementById('hand-dot').classList.remove('off');
+    document.getElementById('hand-chip').textContent='HAND ON';
+    document.getElementById('st-gest').textContent=g.toUpperCase();
+    document.getElementById('st-pos').textContent=Math.round(hx*100)+','+Math.round(hy*100);
+    if(res.multiHandedness&&res.multiHandedness[0])
+      document.getElementById('st-conf').textContent=Math.round(res.multiHandedness[0].score*100)+'%';
   } else {
-    handPresent = false;
-    currentGesture = 'none';
-    updateHandStatus(false);
+    handOn=false; curGesture='none';
+    document.getElementById('hand-dot').classList.add('off');
+    document.getElementById('hand-chip').textContent='NO HAND';
+    document.getElementById('st-gest').textContent='—';
+    document.getElementById('st-pos').textContent='—';
+    document.querySelectorAll('.g-item').forEach(function(g){g.classList.remove('active');});
   }
 }
 
-function updateHandStatus(active) {
-  document.getElementById('hand-dot').classList.toggle('inactive', !active);
-  document.getElementById('hand-status-text').textContent = active ? 'HAND DETECTED' : 'NO HANDS';
-  document.getElementById('stat-gesture').textContent = '—';
-  document.getElementById('stat-pos').textContent = '—';
-  document.getElementById('stat-conf').textContent = '—';
-  document.querySelectorAll('.gesture-item').forEach(g => g.classList.remove('active'));
-}
+// ─── GESTURE ──────────────────────────────────────────────
+function d3(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2+(a.z-b.z)**2);}
 
-// ==============================
-// GESTURE DETECTION
-// ==============================
-function detectGesture(lm) {
-  const fingerTips = [8, 12, 16, 20]; // index, middle, ring, pinky
-  const fingerBases = [6, 10, 14, 18];
-  const thumbTip = lm[4];
-  const indexTip = lm[8];
-  const wrist = lm[0];
-
-  // Finger states (extended = tip above base)
-  const extended = fingerTips.map((tip, i) => lm[tip].y < lm[fingerBases[i]].y);
-  const thumbExtended = thumbTip.x < lm[3].x; // rough thumb check
-
-  // Pinch: thumb and index close
-  const pinchDist = dist3d(thumbTip, indexTip);
-  if (pinchDist < 0.06) { currentGesture = 'pinch'; return 'pinch'; }
-
-  // Fist: all fingers curled
-  if (extended.every(e => !e) && !thumbExtended) { currentGesture = 'fist'; return 'fist'; }
-
-  // Open palm: all extended
-  if (extended.every(e => e)) { currentGesture = 'open'; return 'open'; }
-
-  // Point: only index extended
-  if (extended[0] && !extended[1] && !extended[2] && !extended[3]) { currentGesture = 'point'; return 'point'; }
-
-  // Peace: index and middle extended
-  if (extended[0] && extended[1] && !extended[2] && !extended[3]) { currentGesture = 'peace'; return 'peace'; }
-
-  // OK: thumb and index form circle (other fingers extended)
-  if (pinchDist < 0.1 && extended[1] && extended[2]) { currentGesture = 'ok'; return 'ok'; }
-
-  // Thumbs up: thumb extended, others curled
-  if (!extended.every(e=>!e) && thumbExtended && extended.filter(Boolean).length <= 1) { currentGesture = 'thumb'; return 'thumb'; }
-
-  currentGesture = 'neutral';
+function detectGesture(lm){
+  var tips=[8,12,16,20],bases=[6,10,14,18];
+  var ext=tips.map(function(t,i){return lm[t].y<lm[bases[i]].y;});
+  var thx=lm[4].x<lm[3].x;
+  var pd=d3(lm[4],lm[8]);
+  if(pd<0.065) return 'pinch';
+  if(ext.every(function(e){return !e;})&&!thx) return 'fist';
+  if(ext.every(function(e){return e;})) return 'open';
+  if(ext[0]&&!ext[1]&&!ext[2]&&!ext[3]) return 'point';
+  if(ext[0]&&ext[1]&&!ext[2]&&!ext[3]) return 'peace';
+  if(ext[0]&&!ext[1]&&!ext[2]&&ext[3]) return 'horns';
+  if(pd<0.11&&ext[1]&&ext[2]) return 'ok';
+  if(thx&&!ext[0]&&!ext[1]&&!ext[2]&&!ext[3]) return 'thumb';
   return 'neutral';
 }
 
-function dist3d(a, b) {
-  return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2);
-}
-
-const gestureActions = {
-  open: () => { explodeAll(); showGestureTooltip('🖐️', 'EXPLODE BURST'); },
-  fist: () => { showGestureTooltip('✊', 'GRAVITY PULL'); },
-  point: () => { showGestureTooltip('☝️', 'SWIRL ATTRACT'); },
-  peace: () => { showGestureTooltip('✌️', 'ORBIT MODE'); },
-  ok: () => { cycleColorScheme(); showGestureTooltip('👌', 'COLOUR CYCLE'); },
-  thumb: () => { toggleFreeze(); showGestureTooltip('👍', isFrozen ? 'FROZEN' : 'UNFROZEN'); },
-  pinch: () => { showGestureTooltip('🤏', 'SPAWNING PARTICLES'); },
+var GMAP={pinch:'g-pinch',open:'g-open',point:'g-point',fist:'g-fist',peace:'g-peace',ok:'g-ok',thumb:'g-thumb',horns:'g-horns'};
+var GACT={
+  open:function(){doExplode();},
+  ok:function(){doCycleColor();},
+  thumb:function(){doFreeze();},
+  horns:function(){applyPreset('galaxy');},
+  pinch:function(){showTooltip('🤏','SPAWNING');},
+  point:function(){showTooltip('☝️','SWIRL');},
+  fist:function(){showTooltip('✊','PULL');},
+  peace:function(){showTooltip('✌️','ORBIT');}
 };
 
-let gestureDebounce = {};
-function updateGestureUI(gesture, landmarks) {
-  // Highlight active gesture card
-  const map = { pinch:'g-pinch', open:'g-open', point:'g-point', fist:'g-fist', peace:'g-peace', ok:'g-ok', thumb:'g-thumb' };
-  document.querySelectorAll('.gesture-item').forEach(g => g.classList.remove('active'));
-  if (map[gesture]) document.getElementById(map[gesture])?.classList.add('active');
-
-  // Trigger gesture actions (debounced)
-  if (gesture !== lastGesture) {
-    lastGesture = gesture;
-    const action = gestureActions[gesture];
-    if (action) {
-      const now = Date.now();
-      if (!gestureDebounce[gesture] || now - gestureDebounce[gesture] > 1500) {
-        gestureDebounce[gesture] = now;
-        action();
-      }
-    } else {
-      hideGestureTooltip();
+function handleGesture(g,res){
+  curGesture=g;
+  document.querySelectorAll('.g-item').forEach(function(el){el.classList.remove('active');});
+  var gid=GMAP[g]; if(gid){var el=document.getElementById(gid);if(el)el.classList.add('active');}
+  if(g!==prevGesture){
+    prevGesture=g;
+    var act=GACT[g];
+    if(act){
+      var now=Date.now();
+      if(!gdebounce[g]||now-gdebounce[g]>1700){gdebounce[g]=now;act();}
     }
   }
 }
 
-let tooltipTimer;
-function showGestureTooltip(emoji, text) {
-  const tt = document.getElementById('gesture-tooltip');
-  document.getElementById('tooltip-emoji').textContent = emoji;
-  document.getElementById('tooltip-text').textContent = text;
-  tt.classList.add('show');
-  clearTimeout(tooltipTimer);
-  tooltipTimer = setTimeout(() => tt.classList.remove('show'), 1500);
+// ─── COLOUR GRID ──────────────────────────────────────────
+function buildColorGrid(){
+  var grid=document.getElementById('color-grid'); grid.innerHTML='';
+  var pal=PALS[palIdx].concat(PALS[(palIdx+1)%PALS.length]).slice(0,10);
+  pal.forEach(function(hex){
+    var sw=document.createElement('div');
+    sw.className='cswatch'; sw.style.background=hex; sw.title=hex;
+    sw.addEventListener('click',function(){
+      document.querySelectorAll('.cswatch').forEach(function(s){s.classList.remove('active');});
+      sw.classList.add('active');
+      var c=h2r(hex), ca=ptMesh.geometry.attributes.color.array;
+      for(var i=0;i<params.count;i+=2){ ca[i*3]=c.r/255; ca[i*3+1]=c.g/255; ca[i*3+2]=c.b/255; }
+      ptMesh.geometry.attributes.color.needsUpdate=true;
+      notify('Colour: '+hex);
+    });
+    grid.appendChild(sw);
+  });
 }
 
-function hideGestureTooltip() {
-  document.getElementById('gesture-tooltip').classList.remove('show');
+// ─── SLIDERS ──────────────────────────────────────────────
+function setupSliders(){
+  [
+    ['sl-count','v-count','count',0,function(v){params.count=parseInt(v);buildParticles();}],
+    ['sl-size','v-size','size',1,function(v){
+      params.size=parseFloat(v);
+      var sa=ptMesh.geometry.attributes.size.array;
+      for(var i=0;i<params.count;i++) sa[i]=params.size*(0.5+Math.random());
+      ptMesh.geometry.attributes.size.needsUpdate=true;
+    }],
+    ['sl-speed','v-speed','speed',1,null],
+    ['sl-trail','v-trail','trail',2,null],
+    ['sl-gravity','v-gravity','gravity',1,null],
+    ['sl-turb','v-turb','turbulence',2,null],
+  ].forEach(function(d){
+    var el=document.getElementById(d[0]), ve=document.getElementById(d[1]);
+    if(!el||!ve) return;
+    el.addEventListener('input',function(){
+      var v=parseFloat(el.value); params[d[2]]=v; ve.textContent=v.toFixed(d[3]);
+      if(d[4]) d[4](v);
+    });
+  });
 }
 
-// ==============================
-// MOUSE FALLBACK
-// ==============================
-document.addEventListener('mousemove', (e) => {
-  if (!cameraActive) {
-    handX = 1 - e.clientX / window.innerWidth;
-    handY = e.clientY / window.innerHeight;
-    handPresent = true;
+// ─── BUTTONS (addEventListener only) ──────────────────────
+function bindButtons(){
+  function btn(id,fn){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('click',fn);
   }
-});
 
-document.addEventListener('mousedown', () => {
-  if (!cameraActive) { currentGesture = 'pinch'; }
-});
-document.addEventListener('mouseup', () => {
-  if (!cameraActive) { currentGesture = 'neutral'; }
-});
+  btn('btn-cam',function(){ if(camOn) stopCamera(); else startCamera(); });
+  btn('btn-explode',function(){ doExplode(); });
+  btn('btn-reform',function(){ morphTo(curPreset); showTooltip('🔮','REFORMING'); notify('Reforming…'); });
+  btn('btn-freeze',function(){ doFreeze(); });
+  btn('btn-color',function(){ doCycleColor(); });
+  btn('btn-capture',function(){ doCapture(); });
+  btn('btn-clear',function(){ doClear(); });
+  btn('err-close',function(){ document.getElementById('err-overlay').classList.remove('show'); });
 
-// ==============================
-// NOTIFICATION
-// ==============================
-let notifTimer;
-function showNotif(msg) {
-  const notif = document.getElementById('notif');
-  document.getElementById('notif-text').textContent = msg;
-  notif.classList.add('show');
-  clearTimeout(notifTimer);
-  notifTimer = setTimeout(() => notif.classList.remove('show'), 2500);
+  document.querySelectorAll('.pbtn').forEach(function(b){
+    b.addEventListener('click',function(){ applyPreset(b.dataset.preset); });
+  });
 }
 
-// ==============================
-// UTILS
-// ==============================
-function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1,3), 16);
-  const g = parseInt(hex.slice(3,5), 16);
-  const b = parseInt(hex.slice(5,7), 16);
-  return { r, g, b };
-}
+// ─── MOUSE FALLBACK ───────────────────────────────────────
+document.addEventListener('mousemove',function(e){
+  if(!camOn){ hx=1-e.clientX/innerWidth; hy=e.clientY/innerHeight; handOn=true; }
+});
+document.addEventListener('mousedown',function(){ if(!camOn) curGesture='pinch'; });
+document.addEventListener('mouseup',function(){ if(!camOn) curGesture='neutral'; });
+window.addEventListener('wheel',function(e){ cam3.position.z=Math.max(60,Math.min(700,cam3.position.z+e.deltaY*.25)); },{passive:true});
 
-// ==============================
-// INIT
-// ==============================
+var lt=null;
+window.addEventListener('touchmove',function(e){
+  if(e.touches.length===1){
+    var tc=e.touches[0];
+    if(lt) rotY+=(tc.clientX-lt.x)*.005;
+    lt={x:tc.clientX,y:tc.clientY};
+    if(!camOn){ hx=1-tc.clientX/innerWidth; hy=tc.clientY/innerHeight; handOn=true; }
+  }
+},{passive:true});
+window.addEventListener('touchend',function(){lt=null;});
+
+// ─── KEYBOARD ─────────────────────────────────────────────
+window.addEventListener('keydown',function(e){
+  var k=e.key.toLowerCase();
+  if(k==='e') doExplode();
+  else if(k==='f') doFreeze();
+  else if(k==='c') doCycleColor();
+  else if(k==='r') morphTo(curPreset);
+  else if(k==='x') doClear();
+  else if(k==='p') doCapture();
+});
+
+// ─── UI HELPERS ───────────────────────────────────────────
+var ttTID, ntTID;
+function showTooltip(em,tx){
+  document.getElementById('tt-emoji').textContent=em;
+  document.getElementById('tt-text').textContent=tx;
+  var tt=document.getElementById('g-tooltip');
+  tt.classList.add('show'); clearTimeout(ttTID);
+  ttTID=setTimeout(function(){tt.classList.remove('show');},1400);
+}
+function notify(msg){
+  document.getElementById('notif-text').textContent=msg;
+  var n=document.getElementById('notif');
+  n.classList.add('show'); clearTimeout(ntTID);
+  ntTID=setTimeout(function(){n.classList.remove('show');},2800);
+}
+function showError(title,msg){
+  document.getElementById('err-title').textContent=title;
+  document.getElementById('err-msg').textContent=msg;
+  document.getElementById('err-overlay').classList.add('show');
+}
+function h2r(hex){return{r:parseInt(hex.slice(1,3),16),g:parseInt(hex.slice(3,5),16),b:parseInt(hex.slice(5,7),16)};}
+
+// ─── INIT ─────────────────────────────────────────────────
 initThree();
 setupSliders();
 buildColorGrid();
+bindButtons();
 
-// Mouse wheel zoom
-document.addEventListener('wheel', (e) => {
-  camera.position.z = Math.max(50, Math.min(600, camera.position.z + e.deltaY * 0.2));
-});
-
-// Touch to drag
-let lastTouch = null;
-document.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 1) {
-    const t = e.touches[0];
-    if (lastTouch) {
-      sceneRotY += (t.clientX - lastTouch.x) * 0.005;
-    }
-    lastTouch = { x: t.clientX, y: t.clientY };
-    if (!cameraActive) {
-      handX = 1 - t.clientX / window.innerWidth;
-      handY = t.clientY / window.innerHeight;
-      handPresent = true;
-    }
-  }
-}, { passive: true });
-document.addEventListener('touchend', () => { lastTouch = null; });
-
-console.log('%c AETHER 3D PARTICLE SCULPTOR', 'color:#b4dcff;font-size:18px;font-family:monospace;font-weight:bold');
-console.log('%c Hand gesture control + Three.js particle system', 'color:#888');
+})();
 </script>
 </body>
 </html>
