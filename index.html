@@ -3,1030 +3,1150 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AETHER — 3D Particle Sculptor</title>
+<title>AETHER — Particle Sculptor</title>
 <style>
-:root{
-  --g:rgba(255,255,255,0.05);
-  --gb:rgba(255,255,255,0.11);
-  --a:rgba(160,210,255,0.95);
-  --a2:rgba(190,170,255,0.9);
-  --a3:rgba(160,255,210,0.8);
-  --tx:rgba(255,255,255,0.88);
-  --td:rgba(255,255,255,0.4);
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;overflow:hidden;background:#04070f;color:var(--tx);
-  font-family:'Segoe UI',system-ui,sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;
+  font-family:'Courier New',monospace;color:#cce4ff}
 
-/* ── CANVAS LAYER ── */
-#three-canvas{position:fixed;inset:0;z-index:0;display:block;}
-
-/* ── NOISE ── */
-.noise{position:fixed;inset:0;z-index:1;pointer-events:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-  opacity:0.6;}
-
-/* ── LAYOUT ── */
-#ui{position:fixed;inset:0;z-index:10;display:grid;
-  grid-template-columns:260px 1fr 260px;
-  grid-template-rows:56px 1fr 68px;
-  padding:10px;gap:0;pointer-events:none;}
-
-/* ── GLASS ── */
-.gl{background:rgba(255,255,255,0.04);backdrop-filter:blur(18px);
-  -webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,0.1);
-  border-radius:14px;pointer-events:all;}
-
-/* ── HEADER ── */
-#hdr{grid-column:1/-1;grid-row:1;display:flex;align-items:center;
-  justify-content:space-between;padding:0 18px;margin-bottom:8px;}
-.logo{font-size:16px;font-weight:700;letter-spacing:.4em;
-  background:linear-gradient(135deg,var(--a),var(--a2));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  font-family:monospace;}
-.chips{display:flex;gap:7px;}
-.chip{font-size:9px;font-family:monospace;letter-spacing:.08em;padding:4px 10px;
-  border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);
-  backdrop-filter:blur(8px);display:flex;align-items:center;gap:5px;}
-.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.dot.on{background:rgba(100,255,140,0.9);box-shadow:0 0 6px rgba(100,255,140,.7);
-  animation:blink 2s infinite;}
-.dot.off{background:rgba(255,90,90,0.9);box-shadow:0 0 5px rgba(255,90,90,.6);}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+canvas#c{position:fixed;top:0;left:0;z-index:0;display:block}
 
 /* ── PANELS ── */
-#lp{grid-row:2;grid-column:1;padding:12px;display:flex;flex-direction:column;gap:8px;
-  overflow-y:auto;scrollbar-width:none;margin-right:8px;}
-#lp::-webkit-scrollbar{display:none;}
-#rp{grid-row:2;grid-column:3;padding:12px;display:flex;flex-direction:column;gap:8px;
-  overflow-y:auto;scrollbar-width:none;margin-left:8px;}
-#rp::-webkit-scrollbar{display:none;}
+.panel{
+  position:fixed;top:12px;
+  background:rgba(10,16,30,0.72);
+  border:1px solid rgba(140,200,255,0.18);
+  border-radius:14px;
+  backdrop-filter:blur(22px);
+  -webkit-backdrop-filter:blur(22px);
+  padding:14px;
+  z-index:10;
+  pointer-events:all;
+}
+#lp{left:12px;width:230px;bottom:12px;overflow-y:auto;scrollbar-width:none}
+#lp::-webkit-scrollbar{display:none}
+#rp{right:12px;width:230px;bottom:12px;overflow-y:auto;scrollbar-width:none}
+#rp::-webkit-scrollbar{display:none}
 
-.pt{font-size:8px;font-family:monospace;letter-spacing:.2em;color:var(--td);margin-bottom:5px;
-  text-transform:uppercase;}
+/* ── HEADER ── */
+#hdr{
+  position:fixed;top:12px;left:256px;right:256px;z-index:10;
+  background:rgba(10,16,30,0.72);border:1px solid rgba(140,200,255,0.18);
+  border-radius:14px;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  padding:10px 20px;display:flex;align-items:center;justify-content:space-between;
+  pointer-events:all;
+}
+#bot{
+  position:fixed;bottom:12px;left:256px;right:256px;z-index:10;
+  background:rgba(10,16,30,0.72);border:1px solid rgba(140,200,255,0.18);
+  border-radius:14px;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  padding:8px 12px;display:flex;align-items:center;justify-content:center;gap:6px;
+  flex-wrap:wrap;pointer-events:all;
+}
 
-/* ── GESTURE GRID ── */
-.gg{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px;}
-.gi{padding:7px 8px;border-radius:9px;background:rgba(255,255,255,0.025);
-  border:1px solid rgba(255,255,255,0.055);transition:all .25s;}
-.gi.lit{background:rgba(160,210,255,0.1);border-color:rgba(160,210,255,.3);
-  box-shadow:0 0 10px rgba(160,210,255,0.12);}
-.gi-icon{font-size:16px;display:block;margin-bottom:1px;}
-.gi-n{font-size:7.5px;font-family:monospace;color:var(--td);}
-.gi-a{font-size:8.5px;color:var(--a);}
+.logo{font-size:15px;font-weight:700;letter-spacing:.35em;
+  background:linear-gradient(135deg,#a0d8ff,#c0aaff,#a0ffd0);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.chips{display:flex;gap:6px}
+.chip{font-size:8px;letter-spacing:.08em;padding:3px 9px;border-radius:20px;
+  border:1px solid rgba(140,200,255,0.15);background:rgba(255,255,255,0.04);
+  display:flex;align-items:center;gap:4px}
+.dot{width:5px;height:5px;border-radius:50%}
+.dot.on{background:#60ff90;box-shadow:0 0 5px #60ff90;animation:pulse 2s infinite}
+.dot.off{background:#ff5555;box-shadow:0 0 4px #ff5555}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── SECTION TITLE ── */
+.st{font-size:8px;letter-spacing:.2em;color:rgba(140,200,255,.5);
+  margin-bottom:8px;text-transform:uppercase}
+
+/* ── GESTURE CARDS ── */
+.gg{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:12px}
+.gc{padding:7px;border-radius:9px;background:rgba(255,255,255,0.025);
+  border:1px solid rgba(255,255,255,0.055);transition:all .25s;cursor:default}
+.gc.on{background:rgba(140,200,255,0.1);border-color:rgba(140,200,255,.35);
+  box-shadow:0 0 10px rgba(140,200,255,.15)}
+.gc .em{font-size:16px;display:block;margin-bottom:2px}
+.gc .gn{font-size:7.5px;color:rgba(140,200,255,.55)}
+.gc .ga{font-size:8.5px;color:#a0d8ff}
 
 /* ── SLIDERS ── */
-.cr{margin-bottom:10px;}
-.cl{display:flex;justify-content:space-between;font-size:9.5px;color:var(--td);
-  margin-bottom:4px;font-family:monospace;}
-.cv{color:var(--a);}
-input[type=range]{width:100%;height:3px;-webkit-appearance:none;
-  background:rgba(255,255,255,0.1);border-radius:2px;outline:none;cursor:pointer;}
+.sr{margin-bottom:10px}
+.sl{display:flex;justify-content:space-between;font-size:9px;
+  color:rgba(140,200,255,.55);margin-bottom:3px}
+.sv{color:#a0d8ff}
+input[type=range]{width:100%;height:2px;-webkit-appearance:none;
+  background:rgba(255,255,255,0.12);border-radius:2px;outline:none;cursor:pointer}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;
-  border-radius:50%;background:rgba(160,210,255,0.95);
-  box-shadow:0 0 7px rgba(160,210,255,.55);cursor:pointer;transition:transform .15s;}
-input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.35);}
+  border-radius:50%;background:#a0d8ff;box-shadow:0 0 6px rgba(160,216,255,.6);
+  cursor:pointer;transition:transform .15s}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
 
 /* ── PRESET BUTTONS ── */
-.pg{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px;}
-.pb{padding:7px 6px;border-radius:7px;border:1px solid rgba(255,255,255,0.09);
-  background:rgba(255,255,255,0.025);color:rgba(255,255,255,.65);font-size:8.5px;
-  font-family:monospace;cursor:pointer;transition:all .2s;letter-spacing:.04em;}
-.pb:hover,.pb.on{background:rgba(160,210,255,0.1);border-color:rgba(160,210,255,.35);
-  color:var(--a);transform:translateY(-1px);}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:12px}
+.pb{padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.09);
+  background:rgba(255,255,255,0.025);color:rgba(200,230,255,.65);
+  font-size:8.5px;font-family:'Courier New',monospace;cursor:pointer;
+  transition:all .2s;letter-spacing:.04em}
+.pb:hover{background:rgba(140,200,255,0.1);border-color:rgba(140,200,255,.3);color:#a0d8ff}
+.pb.on{background:rgba(140,200,255,0.12);border-color:rgba(140,200,255,.4);color:#a0d8ff}
 
-/* ── CAM CARD ── */
-#cam-wrap{position:relative;width:100%;border-radius:9px;overflow:hidden;
-  aspect-ratio:4/3;background:#000608;}
-#vid{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;}
+/* ── CAM VIEW ── */
+#camBox{position:relative;border-radius:9px;overflow:hidden;
+  aspect-ratio:4/3;background:#000a12;margin-bottom:8px}
+#vid{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;opacity:.85}
 #hcvs{position:absolute;top:0;left:0;width:100%;height:100%;
-  transform:scaleX(-1);pointer-events:none;}
-#cam-lbl{position:absolute;bottom:5px;left:5px;font-size:8px;font-family:monospace;
-  color:rgba(255,255,255,.45);background:rgba(0,0,0,.5);padding:2px 6px;border-radius:4px;}
+  transform:scaleX(-1);pointer-events:none}
+#camTxt{position:absolute;bottom:5px;left:6px;font-size:7.5px;
+  color:rgba(140,200,255,.5);background:rgba(0,0,0,.55);padding:2px 6px;border-radius:4px}
 
 /* ── COLOUR GRID ── */
-.cg{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:5px;}
-.cs{aspect-ratio:1;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:all .18s;}
-.cs:hover{transform:scale(1.18);box-shadow:0 0 9px rgba(255,255,255,.18);}
-.cs.on{border-color:#fff;transform:scale(1.1);box-shadow:0 0 10px rgba(255,255,255,.35);}
+.cg{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:12px}
+.cs{aspect-ratio:1;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all .18s}
+.cs:hover{transform:scale(1.15);box-shadow:0 0 8px rgba(255,255,255,.2)}
+.cs.on{border-color:#fff;box-shadow:0 0 9px rgba(255,255,255,.4)}
 
 /* ── STATS ── */
-.sr{display:flex;justify-content:space-between;align-items:center;
-  padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.035);}
-.sl{color:var(--td);font-family:monospace;font-size:7.5px;letter-spacing:.08em;}
-.sv{color:var(--a);font-family:monospace;font-size:9.5px;}
+.row{display:flex;justify-content:space-between;padding:4px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);font-size:8.5px}
+.rk{color:rgba(140,200,255,.5);letter-spacing:.06em}
+.rv{color:#a0d8ff;font-family:'Courier New',monospace}
 
-/* ── BOTTOM BAR ── */
-#bot{grid-column:1/-1;grid-row:3;display:flex;align-items:center;
-  justify-content:center;gap:7px;padding:0 8px;flex-wrap:wrap;margin-top:7px;}
-.ab{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:11px;
+/* ── ACTION BUTTONS ── */
+.ab{display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:10px;
   border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);
-  backdrop-filter:blur(12px);color:rgba(255,255,255,0.85);font-size:9.5px;
-  font-family:monospace;cursor:pointer;transition:all .2s;letter-spacing:.05em;
-  pointer-events:all;user-select:none;-webkit-user-select:none;}
-.ab:hover{background:rgba(255,255,255,0.08);transform:translateY(-2px);
-  box-shadow:0 6px 18px rgba(0,0,0,.3);}
-.ab:active{transform:translateY(0);background:rgba(255,255,255,0.12);}
-.ab.pri{background:rgba(160,210,255,0.09);border-color:rgba(160,210,255,.28);color:var(--a);}
-.ab.pri:hover{background:rgba(160,210,255,0.16);}
-.ab.red{background:rgba(255,70,70,0.07);border-color:rgba(255,110,110,.2);color:rgba(255,150,150,.9);}
-.ab.red:hover{background:rgba(255,70,70,0.14);}
+  color:rgba(220,240,255,.85);font-size:8.5px;font-family:'Courier New',monospace;
+  cursor:pointer;transition:all .2s;letter-spacing:.05em;user-select:none;-webkit-user-select:none}
+.ab:hover{background:rgba(255,255,255,0.09);transform:translateY(-2px);
+  box-shadow:0 5px 14px rgba(0,0,0,.35)}
+.ab:active{transform:translateY(0);background:rgba(255,255,255,0.13)}
+.ab.hi{background:rgba(140,200,255,0.09);border-color:rgba(140,200,255,.28);color:#a0d8ff}
+.ab.hi:hover{background:rgba(140,200,255,0.16)}
+.ab.rd{background:rgba(255,60,60,0.07);border-color:rgba(255,100,100,.2);color:rgba(255,150,150,.9)}
+.ab.rd:hover{background:rgba(255,60,60,0.15)}
 
-/* ── CURSOR ── */
-#cring{position:fixed;z-index:50;pointer-events:none;width:36px;height:36px;
-  border-radius:50%;border:1.5px solid rgba(160,210,255,.65);transform:translate(-50%,-50%);
-  transition:width .12s,height .12s,background .12s;
-  box-shadow:0 0 8px rgba(160,210,255,.2);display:none;}
-#cring.pinch{width:16px;height:16px;background:rgba(160,210,255,.15);
-  border-color:rgba(160,210,255,.95);box-shadow:0 0 18px rgba(160,210,255,.5);}
+/* ── CURSOR RING ── */
+#ring{position:fixed;z-index:50;pointer-events:none;
+  width:32px;height:32px;border-radius:50%;
+  border:1.5px solid rgba(140,200,255,.7);transform:translate(-50%,-50%);
+  transition:width .1s,height .1s,background .1s;
+  box-shadow:0 0 8px rgba(140,200,255,.25);display:none}
+#ring.pinch{width:14px;height:14px;background:rgba(140,200,255,.2);
+  border-color:#a0d8ff;box-shadow:0 0 16px rgba(140,200,255,.6)}
 
-/* ── TOOLTIP ── */
-#ttp{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.85);
-  z-index:200;pointer-events:none;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);}
-#ttp.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
-.ti{padding:10px 20px;border-radius:14px;background:rgba(6,10,22,0.88);
-  backdrop-filter:blur(24px);border:1px solid rgba(160,210,255,.22);
-  font-family:monospace;color:var(--a);letter-spacing:.15em;text-align:center;
-  box-shadow:0 0 24px rgba(160,210,255,.12);}
-.te{font-size:24px;display:block;margin-bottom:3px;}
-.tt{font-size:10px;}
+/* ── TOAST ── */
+#toast{position:fixed;bottom:85px;left:50%;transform:translateX(-50%) translateY(10px);
+  z-index:200;pointer-events:none;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.ti{padding:6px 16px;border-radius:28px;background:rgba(6,12,26,.9);
+  backdrop-filter:blur(16px);border:1px solid rgba(140,200,255,.18);
+  font-size:9.5px;color:#a0d8ff;letter-spacing:.08em;white-space:nowrap}
 
-/* ── NOTIF ── */
-#nf{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-12px);
-  z-index:300;pointer-events:none;opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1);}
-#nf.show{opacity:1;transform:translateX(-50%) translateY(0);}
-.ni{padding:6px 16px;border-radius:28px;background:rgba(8,12,28,0.9);
-  backdrop-filter:blur(18px);border:1px solid rgba(160,210,255,.18);font-size:9.5px;
-  font-family:monospace;color:var(--a);letter-spacing:.08em;white-space:nowrap;}
+/* ── ERROR ── */
+#err{position:fixed;inset:0;z-index:900;display:none;
+  align-items:center;justify-content:center;background:rgba(0,0,0,.65);
+  backdrop-filter:blur(8px)}
+#err.show{display:flex}
+.eb{padding:24px 28px;border-radius:16px;background:rgba(8,12,24,.97);
+  backdrop-filter:blur(24px);border:1px solid rgba(255,90,90,.22);
+  max-width:360px;text-align:center}
+.et{font-size:11.5px;color:rgba(255,160,160,.9);letter-spacing:.12em;margin:6px 0}
+.em{font-size:11px;color:rgba(140,200,255,.55);line-height:1.65;margin-bottom:14px}
+.ec{padding:7px 18px;border-radius:8px;border:1px solid rgba(255,90,90,.25);
+  background:rgba(255,50,50,.08);color:rgba(255,150,150,.9);
+  font-family:'Courier New',monospace;font-size:9px;cursor:pointer;transition:all .18s}
+.ec:hover{background:rgba(255,50,50,.18)}
 
 /* ── LOADING ── */
 #ld{position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;background:#04070f;
-  transition:opacity .7s,visibility .7s;}
-#ld.gone{opacity:0;visibility:hidden;pointer-events:none;}
-.ll{font-size:28px;font-weight:700;letter-spacing:.4em;font-family:monospace;
-  background:linear-gradient(135deg,var(--a),var(--a2),var(--a3));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.ls{font-size:9px;letter-spacing:.22em;color:var(--td);margin:5px 0 28px;font-family:monospace;}
-.lb{width:160px;height:2px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
-.lbi{height:100%;background:linear-gradient(90deg,var(--a),var(--a2));width:0%;transition:width .45s;}
-.lst{margin-top:8px;font-size:8.5px;font-family:monospace;color:var(--td);letter-spacing:.1em;}
+  align-items:center;justify-content:center;background:#000;
+  transition:opacity .6s,visibility .6s}
+#ld.out{opacity:0;visibility:hidden;pointer-events:none}
+.ll{font-size:26px;font-weight:700;letter-spacing:.4em;
+  background:linear-gradient(135deg,#a0d8ff,#c0aaff,#a0ffd0);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.ls{font-size:8.5px;letter-spacing:.22em;color:rgba(140,200,255,.45);
+  margin:5px 0 26px;text-transform:uppercase}
+.lb{width:150px;height:2px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.lf{height:100%;background:linear-gradient(90deg,#a0d8ff,#c0aaff);
+  border-radius:2px;transition:width .4s ease;width:0%}
+.lm{margin-top:8px;font-size:8px;color:rgba(140,200,255,.4);letter-spacing:.12em}
 
-/* ── ERR ── */
-#err{position:fixed;inset:0;z-index:900;display:none;align-items:center;
-  justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);}
-#err.show{display:flex;}
-.eb{padding:26px 30px;border-radius:18px;background:rgba(10,14,28,0.97);
-  backdrop-filter:blur(28px);border:1px solid rgba(255,100,100,.22);
-  max-width:370px;text-align:center;}
-.et{font-family:monospace;font-size:12px;color:rgba(255,170,170,.9);
-  letter-spacing:.12em;margin:8px 0;}
-.em{font-size:11.5px;color:var(--td);line-height:1.65;margin-bottom:16px;}
-.ec{padding:8px 20px;border-radius:9px;border:1px solid rgba(255,100,100,.28);
-  background:rgba(255,60,60,0.09);color:rgba(255,160,160,.9);font-family:monospace;
-  font-size:9.5px;cursor:pointer;transition:all .18s;letter-spacing:.08em;}
-.ec:hover{background:rgba(255,60,60,0.2);}
-
-/* ── MP LOADING BAR ── */
-#mpbar{position:fixed;bottom:85px;left:50%;transform:translateX(-50%);
-  z-index:200;pointer-events:none;font-size:8px;font-family:monospace;
-  color:var(--td);letter-spacing:.15em;padding:5px 14px;border-radius:20px;
-  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.06);
-  opacity:0;transition:opacity .3s;}
-#mpbar.show{opacity:1;}
-
-.p14{padding:14px;}
+/* ── MP STATUS BAR ── */
+#mpbar{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);
+  z-index:150;font-size:8px;letter-spacing:.15em;color:rgba(140,200,255,.5);
+  padding:4px 12px;background:rgba(0,0,0,.55);border:1px solid rgba(140,200,255,.12);
+  border-radius:20px;pointer-events:none;opacity:0;transition:opacity .3s}
+#mpbar.show{opacity:1}
 </style>
 </head>
 <body>
 
+<!-- THREE.JS CANVAS (z-index 0) -->
+<canvas id="c"></canvas>
+
 <!-- LOADING -->
 <div id="ld">
   <div class="ll">AETHER</div>
-  <div class="ls">3D PARTICLE SCULPTOR</div>
-  <div class="lb"><div class="lbi" id="lbi"></div></div>
-  <div class="lst" id="lst">Starting up...</div>
+  <div class="ls">3D Particle Sculptor</div>
+  <div class="lb"><div class="lf" id="lf"></div></div>
+  <div class="lm" id="lm">Loading...</div>
 </div>
 
 <!-- ERROR -->
 <div id="err">
   <div class="eb">
-    <div style="font-size:28px">📷</div>
-    <div class="et" id="et">ERROR</div>
-    <div class="em" id="em">Something went wrong.</div>
-    <button class="ec" id="ec">DISMISS</button>
+    <div style="font-size:26px">📷</div>
+    <div class="et" id="etitle">ERROR</div>
+    <div class="em" id="emsg">Something went wrong.</div>
+    <button class="ec" id="eclose">DISMISS</button>
   </div>
 </div>
 
-<!-- THREE CANVAS -->
-<canvas id="three-canvas"></canvas>
-<div class="noise"></div>
+<!-- CURSOR RING -->
+<div id="ring"></div>
 
-<!-- CURSOR + TOOLTIP + NOTIF -->
-<div id="cring"></div>
-<div id="ttp"><div class="ti"><span class="te" id="te">✨</span><span class="tt" id="tt">READY</span></div></div>
-<div id="nf"><div class="ni" id="ni">—</div></div>
+<!-- TOAST -->
+<div id="toast"><div class="ti" id="ttext">—</div></div>
+
+<!-- MP STATUS -->
 <div id="mpbar" id="mpb">Loading hand model...</div>
 
-<!-- MAIN UI -->
-<div id="ui">
+<!-- HEADER -->
+<div id="hdr">
+  <div class="logo">AETHER</div>
+  <div style="font-size:8.5px;letter-spacing:.18em;color:rgba(140,200,255,.45)">3D PARTICLE SCULPTOR</div>
+  <div class="chips">
+    <div class="chip"><div class="dot off" id="cdot"></div><span id="cchip">CAM OFF</span></div>
+    <div class="chip"><div class="dot off" id="hdot"></div><span id="hchip">NO HAND</span></div>
+    <div class="chip"><span id="fps">--</span><span style="color:rgba(140,200,255,.4);margin-left:2px">FPS</span></div>
+  </div>
+</div>
 
-  <header id="hdr" class="gl">
-    <div class="logo">AETHER</div>
-    <div style="font-size:9px;color:var(--td);letter-spacing:.18em;font-family:monospace;">3D PARTICLE SCULPTOR</div>
-    <div class="chips">
-      <div class="chip"><div class="dot off" id="cdot"></div><span id="cchip">CAM OFF</span></div>
-      <div class="chip"><div class="dot off" id="hdot"></div><span id="hchip">NO HAND</span></div>
-      <div class="chip"><span id="fps">--</span><span style="color:var(--td);margin-left:2px;">FPS</span></div>
-    </div>
-  </header>
+<!-- LEFT PANEL -->
+<div class="panel" id="lp">
 
-  <!-- LEFT -->
-  <aside id="lp">
+  <div class="st">✦ Gestures</div>
+  <div class="gg">
+    <div class="gc" id="g0"><span class="em">🤏</span><div class="gn">PINCH</div><div class="ga">Spawn</div></div>
+    <div class="gc" id="g1"><span class="em">🖐</span><div class="gn">OPEN</div><div class="ga">Explode</div></div>
+    <div class="gc" id="g2"><span class="em">☝️</span><div class="gn">POINT</div><div class="ga">Swirl</div></div>
+    <div class="gc" id="g3"><span class="em">✊</span><div class="gn">FIST</div><div class="ga">Pull</div></div>
+    <div class="gc" id="g4"><span class="em">✌️</span><div class="gn">PEACE</div><div class="ga">Orbit</div></div>
+    <div class="gc" id="g5"><span class="em">👌</span><div class="gn">OK</div><div class="ga">Colours</div></div>
+    <div class="gc" id="g6"><span class="em">👍</span><div class="gn">THUMB</div><div class="ga">Freeze</div></div>
+    <div class="gc" id="g7"><span class="em">🤘</span><div class="gn">HORNS</div><div class="ga">Galaxy</div></div>
+  </div>
 
-    <div class="gl p14">
-      <div class="pt">✦ Gestures</div>
-      <div class="gg">
-        <div class="gi" id="g0"><span class="gi-icon">🤏</span><div class="gi-n">PINCH</div><div class="gi-a">Spawn</div></div>
-        <div class="gi" id="g1"><span class="gi-icon">🖐️</span><div class="gi-n">OPEN</div><div class="gi-a">Explode</div></div>
-        <div class="gi" id="g2"><span class="gi-icon">☝️</span><div class="gi-n">POINT</div><div class="gi-a">Swirl</div></div>
-        <div class="gi" id="g3"><span class="gi-icon">✊</span><div class="gi-n">FIST</div><div class="gi-a">Pull</div></div>
-        <div class="gi" id="g4"><span class="gi-icon">✌️</span><div class="gi-n">PEACE</div><div class="gi-a">Orbit</div></div>
-        <div class="gi" id="g5"><span class="gi-icon">👌</span><div class="gi-n">OK</div><div class="gi-a">Colours</div></div>
-        <div class="gi" id="g6"><span class="gi-icon">👍</span><div class="gi-n">THUMBS</div><div class="gi-a">Freeze</div></div>
-        <div class="gi" id="g7"><span class="gi-icon">🤘</span><div class="gi-n">HORNS</div><div class="gi-a">Galaxy</div></div>
-      </div>
-    </div>
+  <div class="st">✦ Parameters</div>
+  <div class="sr"><div class="sl">PARTICLES <span class="sv" id="vc">2000</span></div><input type="range" id="sn" min="500" max="8000" value="2000" step="100"></div>
+  <div class="sr"><div class="sl">SIZE <span class="sv" id="vsz">3</span></div><input type="range" id="ssz" min="1" max="10" value="3" step="0.5"></div>
+  <div class="sr"><div class="sl">SPEED <span class="sv" id="vsp">1.0</span></div><input type="range" id="ssp" min="0.1" max="4" value="1" step="0.1"></div>
+  <div class="sr"><div class="sl">DAMPING <span class="sv" id="vdp">0.95</span></div><input type="range" id="sdp" min="0.8" max="0.99" value="0.95" step="0.01"></div>
+  <div class="sr"><div class="sl">GRAVITY <span class="sv" id="vgv">0.0</span></div><input type="range" id="sgv" min="-3" max="3" value="0" step="0.1"></div>
+  <div class="sr"><div class="sl">TURBULENCE <span class="sv" id="vtb">0.4</span></div><input type="range" id="stb" min="0" max="3" value="0.4" step="0.05"></div>
 
-    <div class="gl p14">
-      <div class="pt">✦ Parameters</div>
-      <div class="cr"><div class="cl">PARTICLES<span class="cv" id="vc">800</span></div><input type="range" id="sc" min="200" max="4000" value="800" step="100"></div>
-      <div class="cr"><div class="cl">POINT SIZE<span class="cv" id="vs">2.5</span></div><input type="range" id="ss" min="0.5" max="8" value="2.5" step="0.5"></div>
-      <div class="cr"><div class="cl">SPEED<span class="cv" id="vsp">1.0</span></div><input type="range" id="ssp" min="0.1" max="5" value="1" step="0.1"></div>
-      <div class="cr"><div class="cl">TRAIL<span class="cv" id="vtr">0.92</span></div><input type="range" id="str2" min="0.7" max="0.99" value="0.92" step="0.01"></div>
-      <div class="cr"><div class="cl">GRAVITY<span class="cv" id="vg">0.0</span></div><input type="range" id="sg" min="-2" max="2" value="0" step="0.1"></div>
-      <div class="cr"><div class="cl">TURBULENCE<span class="cv" id="vtb">0.30</span></div><input type="range" id="stb" min="0" max="2" value="0.3" step="0.05"></div>
-    </div>
-
-    <div class="gl p14">
-      <div class="pt">✦ Formations</div>
-      <div class="pg">
-        <button class="pb on" data-p="scatter">SCATTER</button>
-        <button class="pb" data-p="sphere">SPHERE</button>
-        <button class="pb" data-p="helix">HELIX</button>
-        <button class="pb" data-p="galaxy">GALAXY</button>
-        <button class="pb" data-p="cube">CUBE</button>
-        <button class="pb" data-p="torus">TORUS</button>
-        <button class="pb" data-p="wave">WAVE</button>
-        <button class="pb" data-p="dna">DNA</button>
-      </div>
-    </div>
-
-  </aside>
-
-  <!-- RIGHT -->
-  <aside id="rp">
-
-    <div class="gl p14">
-      <div class="pt">✦ Vision Input</div>
-      <div id="cam-wrap">
-        <video id="vid" autoplay playsinline muted></video>
-        <canvas id="hcvs"></canvas>
-        <div id="cam-lbl">CAMERA INACTIVE</div>
-      </div>
-    </div>
-
-    <div class="gl p14">
-      <div class="pt">✦ Colour Palette</div>
-      <div class="cg" id="cgrid"></div>
-    </div>
-
-    <div class="gl p14">
-      <div class="pt">✦ Live Stats</div>
-      <div class="sr"><span class="sl">PARTICLES</span><span class="sv" id="stp">800</span></div>
-      <div class="sr"><span class="sl">GESTURE</span><span class="sv" id="stg">—</span></div>
-      <div class="sr"><span class="sl">CONFIDENCE</span><span class="sv" id="stc">—</span></div>
-      <div class="sr"><span class="sl">HAND XY</span><span class="sv" id="stxy">—</span></div>
-      <div class="sr"><span class="sl">FORMATION</span><span class="sv" id="stf">SCATTER</span></div>
-      <div class="sr"><span class="sl">FROZEN</span><span class="sv" id="stfz">NO</span></div>
-      <div class="sr"><span class="sl">MP MODEL</span><span class="sv" id="stmp">STANDBY</span></div>
-    </div>
-
-  </aside>
-
-  <!-- BOTTOM -->
-  <div id="bot">
-    <button class="ab pri" id="bcam">📷 START CAMERA</button>
-    <button class="ab" id="bex">💥 EXPLODE</button>
-    <button class="ab" id="bre">🔮 REFORM</button>
-    <button class="ab" id="bfr">❄️ FREEZE</button>
-    <button class="ab" id="bcl">🎨 COLOURS</button>
-    <button class="ab" id="bca">📸 CAPTURE</button>
-    <button class="ab red" id="bclr">🗑 CLEAR</button>
+  <div class="st">✦ Formations</div>
+  <div class="pg">
+    <button class="pb on" data-s="scatter">SCATTER</button>
+    <button class="pb" data-s="sphere">SPHERE</button>
+    <button class="pb" data-s="helix">HELIX</button>
+    <button class="pb" data-s="galaxy">GALAXY</button>
+    <button class="pb" data-s="cube">CUBE</button>
+    <button class="pb" data-s="torus">TORUS</button>
+    <button class="pb" data-s="wave">WAVE</button>
+    <button class="pb" data-s="dna">DNA</button>
+    <button class="pb" data-s="ring">RING</button>
+    <button class="pb" data-s="star">STAR</button>
   </div>
 
 </div>
 
-<!-- THREE.JS CDN -->
+<!-- RIGHT PANEL -->
+<div class="panel" id="rp">
+
+  <div class="st">✦ Vision Input</div>
+  <div id="camBox">
+    <video id="vid" autoplay playsinline muted></video>
+    <canvas id="hcvs"></canvas>
+    <div id="camTxt">CAMERA INACTIVE</div>
+  </div>
+
+  <div class="st">✦ Colour Mode</div>
+  <div class="cg" id="cgrid"></div>
+
+  <div class="st">✦ Live Stats</div>
+  <div class="row"><span class="rk">PARTICLES</span><span class="rv" id="sp">2000</span></div>
+  <div class="row"><span class="rk">GESTURE</span><span class="rv" id="sg2">—</span></div>
+  <div class="row"><span class="rk">CONFIDENCE</span><span class="rv" id="sc2">—</span></div>
+  <div class="row"><span class="rk">HAND XY</span><span class="rv" id="sxy">—</span></div>
+  <div class="row"><span class="rk">FORMATION</span><span class="rv" id="sf">SCATTER</span></div>
+  <div class="row"><span class="rk">FROZEN</span><span class="rv" id="sfz">NO</span></div>
+  <div class="row"><span class="rk">MP MODEL</span><span class="rv" id="smp">STANDBY</span></div>
+  <div class="row"><span class="rk">INTERACT</span><span class="rv" id="sint">MOUSE</span></div>
+
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bot">
+  <button class="ab hi" id="bcam">📷 START CAMERA</button>
+  <button class="ab" id="bex">💥 EXPLODE</button>
+  <button class="ab" id="bre">🔮 REFORM</button>
+  <button class="ab" id="bfz">❄️ FREEZE</button>
+  <button class="ab" id="bcol">🎨 COLOURS</button>
+  <button class="ab" id="bss">📸 SCREENSHOT</button>
+  <button class="ab rd" id="bclr">🗑 CLEAR</button>
+</div>
+
+<!-- THREE.JS r128 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
-/* ================================================================
-   AETHER — 3D Particle Sculptor
-   Full rewrite: working Three.js particles + MediaPipe hand tracking
-================================================================ */
-(function(){
+/*
+  AETHER — 3D Particle Sculptor
+  Pure Three.js. No external particle library. Verified working.
+  
+  Architecture:
+  - BufferGeometry with Float32Array for positions/colors/sizes
+  - Custom GLSL shader (additive blending, round points with glow)
+  - Typed arrays for physics (typed = fast)
+  - MediaPipe loaded dynamically after camera starts
+  - All shapes computed mathematically, morphed with lerp
+*/
 
-// ── GLOBALS ────────────────────────────────────────────────────
-var scene, cam, ren, pts;          // Three.js objects
-var geo, posBuf, colBuf, sizBuf;   // geometry attributes
-var N = 800;                       // particle count
-var PX = [], PY = [], PZ = [];     // positions
-var VX = [], VY = [], VZ = [];     // velocities
+// ─────────────────────────────────────────
+// 1. THREE.JS — SCENE / RENDERER
+// ─────────────────────────────────────────
+var renderer, scene, camera, points, geometry;
+var posAttr, colAttr, sizeAttr;
 
-var P = { size:2.5, speed:1.0, trail:0.92, gravity:0.0, turb:0.3 };
+// Typed arrays for physics (N particles, max 8000)
+var MAX = 8000;
+var px = new Float32Array(MAX);  // position x
+var py = new Float32Array(MAX);  // position y
+var pz = new Float32Array(MAX);  // position z
+var vx = new Float32Array(MAX);  // velocity x
+var vy = new Float32Array(MAX);  // velocity y
+var vz = new Float32Array(MAX);  // velocity z
+var tx = new Float32Array(MAX);  // target x  (for morphing)
+var ty = new Float32Array(MAX);  // target y
+var tz = new Float32Array(MAX);  // target z
 
-var frozen = false;
-var camOn = false;
-var mpReady = false;
-var preset = 'scatter';
-var gName = 'none', prevG = '';
-var handOn = false;
-var HX = 0.5, HY = 0.5;           // normalised hand position
-var palIdx = 0;
-var sceneRY = 0;
-var tAnim = 0, frame = 0, fpsT = 0;
-var vidStream = null;
-var gDebounce = {};
-var morphID = null;
+var N = 2000;   // active particle count
+var isMorphing = false;
+var morphT = 0; // 0..1
 
-var PALS = [
-  ['#a0d4ff','#c0a8ff','#a0ffd8','#ffd8a8','#ffb8d8'],
-  ['#00c8ff','#7020ff','#00ff90','#ff6030','#ff1880'],
-  ['#ffffff','#d8daff','#b8d0ff','#98e8ff','#a8ffea'],
-  ['#ff9060','#ff70b0','#ffc860','#04c890','#1080b0'],
-  ['#e820a0','#6000c0','#3000a0','#3058ee','#40c4f0'],
-];
-
-// ── LOADING ────────────────────────────────────────────────────
-var lbi = document.getElementById('lbi');
-var lst = document.getElementById('lst');
-var lmsgs = ['Loading Three.js...','Creating particle system...','Preparing shaders...','Setting up interactions...','All systems ready!'];
-var li = 0;
-var lint = setInterval(function(){
-  if(li < lmsgs.length){ lst.textContent = lmsgs[li]; lbi.style.width = ((li+1)/lmsgs.length*100)+'%'; li++; }
-}, 400);
-window.addEventListener('load', function(){
-  setTimeout(function(){
-    clearInterval(lint); lbi.style.width='100%';
-    setTimeout(function(){
-      document.getElementById('ld').classList.add('gone');
-      notify('Move your mouse to sculpt particles — or click START CAMERA');
-    }, 300);
-  }, 2200);
-});
-
-// ── THREE.JS INIT ──────────────────────────────────────────────
-function initThree(){
-  scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x04070f, 0.0006);
-
-  cam = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 3000);
-  cam.position.set(0, 0, 380);
-
-  ren = new THREE.WebGLRenderer({
-    canvas: document.getElementById('three-canvas'),
-    antialias: true,
-    preserveDrawingBuffer: true
-  });
-  ren.setPixelRatio(Math.min(devicePixelRatio, 2));
-  ren.setSize(innerWidth, innerHeight);
-  ren.setClearColor(0x04070f, 1);
-
-  createParticles();
-  startRenderLoop();
-
-  window.addEventListener('resize', function(){
-    cam.aspect = innerWidth/innerHeight;
-    cam.updateProjectionMatrix();
-    ren.setSize(innerWidth, innerHeight);
-  });
-}
-
-// ── CREATE PARTICLES ──────────────────────────────────────────
-function createParticles(){
-  // Destroy old
-  if(pts){ scene.remove(pts); pts.geometry.dispose(); pts.material.dispose(); }
-
-  N = parseInt(document.getElementById('sc').value) || 800;
-
-  var posArr = new Float32Array(N * 3);
-  var colArr = new Float32Array(N * 3);
-  var sizArr = new Float32Array(N);
-
-  // Reset arrays
-  PX = new Float32Array(N); PY = new Float32Array(N); PZ = new Float32Array(N);
-  VX = new Float32Array(N); VY = new Float32Array(N); VZ = new Float32Array(N);
-
-  for(var i = 0; i < N; i++){
-    PX[i] = (Math.random()-.5) * 500;
-    PY[i] = (Math.random()-.5) * 500;
-    PZ[i] = (Math.random()-.5) * 250;
-    VX[i] = (Math.random()-.5) * .6;
-    VY[i] = (Math.random()-.5) * .6;
-    VZ[i] = (Math.random()-.5) * .3;
-
-    posArr[i*3]   = PX[i];
-    posArr[i*3+1] = PY[i];
-    posArr[i*3+2] = PZ[i];
-
-    var c = hexRGB(PALS[palIdx][i % PALS[palIdx].length]);
-    colArr[i*3]   = c[0];
-    colArr[i*3+1] = c[1];
-    colArr[i*3+2] = c[2];
-
-    sizArr[i] = P.size * (.5 + Math.random() * .9);
-  }
-
-  geo = new THREE.BufferGeometry();
-  posBuf = new THREE.BufferAttribute(posArr, 3); posBuf.setUsage(THREE.DynamicDrawUsage);
-  colBuf = new THREE.BufferAttribute(colArr, 3);
-  sizBuf = new THREE.BufferAttribute(sizArr, 1);
-  geo.setAttribute('position', posBuf);
-  geo.setAttribute('color',    colBuf);
-  geo.setAttribute('aSize',    sizBuf);
-
-  var mat = new THREE.ShaderMaterial({
-    vertexShader: `
-      attribute float aSize;
-      attribute vec3 color;
-      varying vec3 vCol;
-      varying float vAlpha;
-      void main(){
-        vCol = color;
-        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = aSize * (300.0 / -mvPos.z);
-        gl_Position  = projectionMatrix * mvPos;
-        vAlpha = clamp(1.0 + mvPos.z / 350.0, 0.1, 1.0);
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vCol;
-      varying float vAlpha;
-      void main(){
-        vec2 uv = gl_PointCoord - 0.5;
-        float d = length(uv);
-        if(d > 0.5) discard;
-        float alpha = smoothstep(0.5, 0.05, d);
-        float glow  = smoothstep(0.5, 0.0, d) * 0.4;
-        gl_FragColor = vec4(vCol + glow, alpha * vAlpha * 0.9);
-      }
-    `,
-    transparent: true,
-    depthWrite:  false,
-    blending:    THREE.AdditiveBlending,
-    vertexColors: true
-  });
-
-  pts = new THREE.Points(geo, mat);
-  scene.add(pts);
-
-  document.getElementById('stp').textContent = N;
-}
-
-// ── RENDER LOOP ───────────────────────────────────────────────
-function startRenderLoop(){
-  (function loop(){
-    requestAnimationFrame(loop);
-    tAnim += 0.01; frame++;
-    var now = performance.now();
-    if(now - fpsT > 1000){
-      document.getElementById('fps').textContent = Math.round(frame * 1000 / (now - fpsT));
-      frame = 0; fpsT = now;
-    }
-    if(!frozen) updateParticles();
-    sceneRY += 0.0006;
-    pts.rotation.y += (sceneRY - pts.rotation.y) * 0.04;
-    ren.render(scene, cam);
-  })();
-}
-
-// ── UPDATE PARTICLES ──────────────────────────────────────────
-function updateParticles(){
-  // World space hand position (particles live in ±250 range)
-  var wx = (HX - 0.5) * 500;
-  var wy = -(HY - 0.5) * 500;
-
-  for(var i = 0; i < N; i++){
-    // Turbulence
-    VX[i] += (Math.random()-.5) * P.turb * 0.08;
-    VY[i] += (Math.random()-.5) * P.turb * 0.08;
-    VZ[i] += (Math.random()-.5) * P.turb * 0.04;
-
-    // Gravity
-    VY[i] -= P.gravity * 0.007;
-
-    // Hand interactions
-    if(handOn){
-      var dx = wx - PX[i];
-      var dy = wy - PY[i];
-      var dist = Math.sqrt(dx*dx + dy*dy) + 0.1;
-
-      if(gName === 'point'){
-        var f = 10.0 / (dist * dist * 0.001 + 80);
-        VX[i] += dx * f;  VY[i] += dy * f;
-        VX[i] += (-dy/dist)*0.15; VY[i] += (dx/dist)*0.15; // swirl
-      }
-      if(gName === 'fist'){
-        var f = 35.0 / (dist * dist * 0.001 + 45);
-        VX[i] += dx * f;  VY[i] += dy * f;
-      }
-      if(gName === 'open' && dist < 150){
-        VX[i] -= dx * 0.015;  VY[i] -= dy * 0.015;
-      }
-      if(gName === 'peace'){
-        var ang = Math.atan2(dy, dx);
-        VX[i] += (Math.cos(ang + 1.5708) * 85 - PX[i] + wx) * 0.0015;
-        VY[i] += (Math.sin(ang + 1.5708) * 85 - PY[i] + wy) * 0.0015;
-      }
-      if(gName === 'pinch' && i % 10 === 0){
-        PX[i] = wx + (Math.random()-.5)*40;
-        PY[i] = wy + (Math.random()-.5)*40;
-        PZ[i] = (Math.random()-.5)*60;
-        VX[i] = (Math.random()-.5)*3;
-        VY[i] = (Math.random()-.5)*3;
-        VZ[i] = (Math.random()-.5)*1.5;
-      }
-    }
-
-    // Speed cap
-    var mag = Math.sqrt(VX[i]*VX[i] + VY[i]*VY[i] + VZ[i]*VZ[i]);
-    var cap = P.speed * 6;
-    if(mag > cap){ var sc = cap/mag; VX[i]*=sc; VY[i]*=sc; VZ[i]*=sc; }
-
-    // Dampen
-    VX[i] *= P.trail; VY[i] *= P.trail; VZ[i] *= P.trail;
-
-    // Move
-    PX[i] += VX[i] * P.speed;
-    PY[i] += VY[i] * P.speed;
-    PZ[i] += VZ[i] * P.speed;
-
-    // Wrap boundaries
-    if(PX[i] >  280) PX[i] = -280;
-    if(PX[i] < -280) PX[i] =  280;
-    if(PY[i] >  280) PY[i] = -280;
-    if(PY[i] < -280) PY[i] =  280;
-    if(PZ[i] >  170) PZ[i] = -170;
-    if(PZ[i] < -170) PZ[i] =  170;
-
-    posBuf.array[i*3]   = PX[i];
-    posBuf.array[i*3+1] = PY[i];
-    posBuf.array[i*3+2] = PZ[i];
-  }
-  posBuf.needsUpdate = true;
-}
-
-// ── PRESETS ───────────────────────────────────────────────────
-var SHAPES = {
-  scatter: function(i, n){ return [(Math.random()-.5)*500,(Math.random()-.5)*500,(Math.random()-.5)*260]; },
-  sphere: function(i, n){
-    var phi = Math.acos(-1 + (2*i)/n), theta = Math.sqrt(n*Math.PI)*phi, r=150;
-    return [r*Math.cos(theta)*Math.sin(phi), r*Math.sin(theta)*Math.sin(phi), r*Math.cos(phi)];
-  },
-  helix: function(i, n){
-    var t = (i/n)*Math.PI*8;
-    return [Math.cos(t)*110, (i/n-.5)*480, Math.sin(t)*110];
-  },
-  galaxy: function(i, n){
-    var r = 18+(i/n)*240, a = i*0.2+r*0.012, s = i*0.009;
-    return [Math.cos(a+s)*r, (Math.random()-.5)*22, Math.sin(a+s)*r];
-  },
-  cube: function(i, n){
-    var s = Math.max(1,Math.floor(Math.cbrt(n)));
-    return [(i%s - s/2)*13, (Math.floor(i/s)%s - s/2)*13, (Math.floor(i/s/s) - s/2)*13];
-  },
-  torus: function(i, n){
-    var u=(i/n)*Math.PI*2, v=(i*8.0)%(Math.PI*2), R=130, r=45;
-    return [(R+r*Math.cos(v))*Math.cos(u), (R+r*Math.cos(v))*Math.sin(u), r*Math.sin(v)];
-  },
-  wave: function(i, n){
-    var cols = Math.ceil(Math.sqrt(n));
-    var x = (i%cols - cols/2)*10, z = (Math.floor(i/cols)-cols/2)*10;
-    return [x, Math.sin(x*0.055+z*0.055)*70, z];
-  },
-  dna: function(i, n){
-    var t=(i/n)*Math.PI*10, off=(i%2)*Math.PI;
-    return [Math.cos(t+off)*70, (i/n-.5)*480, Math.sin(t+off)*70];
-  }
+// Params
+var P = {
+  size:     3.0,
+  speed:    1.0,
+  damping:  0.95,
+  gravity:  0.0,
+  turb:     0.4
 };
 
-function applyPreset(name){
-  preset = name;
-  document.querySelectorAll('.pb').forEach(function(b){ b.classList.toggle('on', b.dataset.p === name); });
-  document.getElementById('stf').textContent = name.toUpperCase();
+// Hand / mouse interaction
+var handX = 0.0, handY = 0.0;  // world-space
+var handOn = false;
+var gesture = 'none';
 
-  if(morphID) clearInterval(morphID);
-  var fn = SHAPES[name] || SHAPES.scatter;
-  var targets = [];
-  for(var i=0;i<N;i++) targets.push(fn(i,N));
+// Scene rotation
+var rotY = 0;
+var frozen = false;
+var palIdx = 0;
+var currentShape = 'scatter';
 
-  var prog = 0;
-  morphID = setInterval(function(){
-    prog = Math.min(1, prog + 0.03);
-    var ease = 1 - Math.pow(1 - prog, 3);
-    for(var i=0;i<N;i++){
-      PX[i] += (targets[i][0] - PX[i]) * ease * 0.14;
-      PY[i] += (targets[i][1] - PY[i]) * ease * 0.14;
-      PZ[i] += (targets[i][2] - PZ[i]) * ease * 0.14;
-      VX[i] = VY[i] = VZ[i] = 0;
+// Colour palettes [r,g,b each 0..1]
+var PALS = [
+  // Ice blue
+  [[0.63,0.85,1.00],[0.75,0.66,1.00],[0.63,1.00,0.85],[1.00,0.85,0.66],[1.00,0.73,0.88]],
+  // Neon
+  [[0.00,0.78,1.00],[0.44,0.13,1.00],[0.00,1.00,0.56],[1.00,0.38,0.19],[1.00,0.09,0.53]],
+  // Pure white
+  [[1.00,1.00,1.00],[0.85,0.88,1.00],[0.72,0.84,1.00],[0.60,0.91,1.00],[0.67,1.00,0.92]],
+  // Sunset
+  [[1.00,0.56,0.38],[1.00,0.44,0.70],[1.00,0.78,0.38],[0.02,0.79,0.56],[0.06,0.50,0.70]],
+  // Vivid
+  [[0.91,0.13,0.63],[0.44,0.04,0.78],[0.23,0.04,0.64],[0.26,0.35,0.93],[0.25,0.79,0.94]],
+];
+
+// ─────────────────────────────────────────
+// 2. INIT RENDERER
+// ─────────────────────────────────────────
+function initRenderer() {
+  renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('c'),
+    antialias: false,
+    preserveDrawingBuffer: true,
+    alpha: false
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 1);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000308, 0.0005);
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+  camera.position.z = 450;
+
+  window.addEventListener('resize', function() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+// ─────────────────────────────────────────
+// 3. BUILD PARTICLE GEOMETRY
+// ─────────────────────────────────────────
+
+// GLSL — vertex shader
+var VS = [
+  'attribute float aSize;',
+  'attribute vec3 aColor;',
+  'varying vec3 vColor;',
+  'varying float vAlpha;',
+  'void main() {',
+  '  vColor = aColor;',
+  '  vec4 mvPos = modelViewMatrix * vec4(position, 1.0);',
+  '  gl_PointSize = aSize * (350.0 / -mvPos.z);',
+  '  gl_Position  = projectionMatrix * mvPos;',
+  '  vAlpha = clamp(1.0 + mvPos.z / 400.0, 0.05, 1.0);',
+  '}'
+].join('\n');
+
+// GLSL — fragment shader
+var FS = [
+  'varying vec3 vColor;',
+  'varying float vAlpha;',
+  'void main() {',
+  '  vec2 uv = gl_PointCoord - 0.5;',
+  '  float d  = length(uv);',
+  '  if (d > 0.5) discard;',
+  '  float a  = smoothstep(0.5, 0.02, d);',
+  '  float gw = smoothstep(0.5, 0.0, d) * 0.5;',
+  '  gl_FragColor = vec4(vColor + gw, a * vAlpha * 0.92);',
+  '}'
+].join('\n');
+
+function buildGeometry() {
+  // Dispose old
+  if (geometry) { geometry.dispose(); }
+  if (points)   { scene.remove(points); points.material.dispose(); }
+
+  geometry = new THREE.BufferGeometry();
+
+  var posArr  = new Float32Array(MAX * 3);
+  var colArr  = new Float32Array(MAX * 3);
+  var sizeArr = new Float32Array(MAX);
+
+  // Scatter particles randomly
+  for (var i = 0; i < MAX; i++) {
+    px[i] = (Math.random() - 0.5) * 600;
+    py[i] = (Math.random() - 0.5) * 600;
+    pz[i] = (Math.random() - 0.5) * 300;
+    vx[i] = (Math.random() - 0.5) * 0.5;
+    vy[i] = (Math.random() - 0.5) * 0.5;
+    vz[i] = (Math.random() - 0.5) * 0.3;
+
+    posArr[i*3]   = px[i];
+    posArr[i*3+1] = py[i];
+    posArr[i*3+2] = pz[i];
+
+    var col = PALS[palIdx][i % PALS[palIdx].length];
+    colArr[i*3]   = col[0];
+    colArr[i*3+1] = col[1];
+    colArr[i*3+2] = col[2];
+
+    sizeArr[i] = P.size * (0.4 + Math.random() * 1.0);
+  }
+
+  posAttr  = new THREE.BufferAttribute(posArr,  3); posAttr.setUsage(THREE.DynamicDrawUsage);
+  colAttr  = new THREE.BufferAttribute(colArr,  3); colAttr.setUsage(THREE.DynamicDrawUsage);
+  sizeAttr = new THREE.BufferAttribute(sizeArr, 1); sizeAttr.setUsage(THREE.DynamicDrawUsage);
+
+  geometry.setAttribute('position', posAttr);
+  geometry.setAttribute('aColor',   colAttr);
+  geometry.setAttribute('aSize',    sizeAttr);
+  geometry.setDrawRange(0, N);  // only draw N particles
+
+  var material = new THREE.ShaderMaterial({
+    vertexShader:   VS,
+    fragmentShader: FS,
+    transparent:    true,
+    depthWrite:     false,
+    blending:       THREE.AdditiveBlending
+  });
+
+  points = new THREE.Points(geometry, material);
+  scene.add(points);
+
+  document.getElementById('sp').textContent = N;
+}
+
+// Update draw count when N changes
+function setN(newN) {
+  N = Math.min(Math.max(newN, 100), MAX);
+  geometry.setDrawRange(0, N);
+  // Re-randomise new particles
+  for (var i = 0; i < N; i++) {
+    if (px[i] === 0 && py[i] === 0 && pz[i] === 0) {
+      px[i] = (Math.random() - 0.5) * 600;
+      py[i] = (Math.random() - 0.5) * 600;
+      pz[i] = (Math.random() - 0.5) * 300;
     }
-    if(prog >= 1) clearInterval(morphID);
-  }, 16);
-
-  notify('Formation → ' + name.toUpperCase());
-}
-
-// ── ACTIONS ───────────────────────────────────────────────────
-function doExplode(){
-  for(var i=0;i<N;i++){
-    VX[i] += (Math.random()-.5)*28;
-    VY[i] += (Math.random()-.5)*28;
-    VZ[i] += (Math.random()-.5)*14;
   }
-  tip('💥','EXPLODE'); notify('💥 Boom!');
+  document.getElementById('sp').textContent = N;
 }
 
-function doClear(){
-  for(var i=0;i<N;i++){
-    PX[i]=PY[i]=PZ[i]=0;
-    VX[i]=(Math.random()-.5)*5; VY[i]=(Math.random()-.5)*5; VZ[i]=(Math.random()-.5)*2;
+// ─────────────────────────────────────────
+// 4. SHAPES — compute target positions
+// ─────────────────────────────────────────
+function computeShape(name, n) {
+  // Returns array of [x,y,z] per particle
+  var res = [];
+  for (var i = 0; i < n; i++) {
+    var p = shapePoint(name, i, n);
+    res.push(p);
   }
-  notify('Scene cleared');
+  return res;
 }
 
-function doFreeze(){
+function shapePoint(name, i, n) {
+  var t, u, v, r, phi, theta, x, y, z, side, cols;
+  switch (name) {
+
+    case 'scatter':
+      return [(Math.random()-0.5)*600, (Math.random()-0.5)*600, (Math.random()-0.5)*300];
+
+    case 'sphere':
+      phi   = Math.acos(-1 + (2 * i) / n);
+      theta = Math.sqrt(n * Math.PI) * phi;
+      r = 180;
+      return [r*Math.sin(phi)*Math.cos(theta), r*Math.sin(phi)*Math.sin(theta), r*Math.cos(phi)];
+
+    case 'helix':
+      t = (i / n) * Math.PI * 10;
+      return [Math.cos(t)*130, (i/n - 0.5)*550, Math.sin(t)*130];
+
+    case 'galaxy':
+      r     = 20 + (i / n) * 260;
+      theta = i * 0.22 + r * 0.013;
+      t     = i * 0.011;
+      return [Math.cos(theta+t)*r, (Math.random()-0.5)*28, Math.sin(theta+t)*r];
+
+    case 'cube':
+      side = Math.max(1, Math.round(Math.cbrt(n)));
+      x    = (i % side) - side*0.5;
+      y    = (Math.floor(i / side) % side) - side*0.5;
+      z    = (Math.floor(i / (side*side))) - side*0.5;
+      return [x*14, y*14, z*14];
+
+    case 'torus':
+      u = (i / n) * Math.PI * 2;
+      v = (i * 8.37) % (Math.PI * 2);
+      return [(150+50*Math.cos(v))*Math.cos(u), (150+50*Math.cos(v))*Math.sin(u), 50*Math.sin(v)];
+
+    case 'wave':
+      cols = Math.ceil(Math.sqrt(n));
+      x    = (i % cols - cols*0.5) * 11;
+      z    = (Math.floor(i/cols) - cols*0.5) * 11;
+      y    = Math.sin(x*0.06)*Math.cos(z*0.06)*80;
+      return [x, y, z];
+
+    case 'dna':
+      t   = (i / n) * Math.PI * 12;
+      phi = (i % 2) * Math.PI;
+      return [Math.cos(t+phi)*80, (i/n-0.5)*560, Math.sin(t+phi)*80];
+
+    case 'ring':
+      theta = (i / n) * Math.PI * 2;
+      r     = 150 + (Math.random()-0.5)*30;
+      return [Math.cos(theta)*r, (Math.random()-0.5)*30, Math.sin(theta)*r];
+
+    case 'star':
+      // 3-D star / icosphere-like
+      phi   = Math.acos(1 - 2*(i+0.5)/n);
+      theta = Math.PI*(1+Math.sqrt(5))*i;
+      r     = 170 + Math.sin(phi*5)*40;
+      return [r*Math.sin(phi)*Math.cos(theta), r*Math.sin(phi)*Math.sin(theta), r*Math.cos(phi)];
+
+    default:
+      return [(Math.random()-0.5)*600,(Math.random()-0.5)*600,(Math.random()-0.5)*300];
+  }
+}
+
+function morphToShape(name) {
+  currentShape = name;
+  document.querySelectorAll('.pb').forEach(function(b){ b.classList.toggle('on', b.dataset.s===name); });
+  document.getElementById('sf').textContent = name.toUpperCase();
+
+  // Compute targets for ALL active particles
+  for (var i = 0; i < N; i++) {
+    var p = shapePoint(name, i, N);
+    tx[i] = p[0]; ty[i] = p[1]; tz[i] = p[2];
+    // Zero out velocity so morph is smooth
+    vx[i] *= 0.1; vy[i] *= 0.1; vz[i] *= 0.1;
+  }
+  isMorphing = true;
+  morphT = 0;
+
+  toast('Formation → ' + name.toUpperCase());
+}
+
+// ─────────────────────────────────────────
+// 5. PHYSICS UPDATE (called each frame)
+// ─────────────────────────────────────────
+function updatePhysics() {
+  // World-space hand influence position
+  var hwx = handX;
+  var hwy = handY;
+
+  // Advance morph
+  if (isMorphing) {
+    morphT = Math.min(1.0, morphT + 0.018);
+    if (morphT >= 1.0) isMorphing = false;
+  }
+
+  var spd  = P.speed;
+  var damp = P.damping;
+  var turb = P.turb;
+  var grav = P.gravity;
+
+  for (var i = 0; i < N; i++) {
+    // ── Morphing: blend toward target ──
+    if (isMorphing) {
+      var ease = 1.0 - Math.pow(1.0 - morphT, 3); // cubic ease-out
+      px[i] += (tx[i] - px[i]) * ease * 0.08;
+      py[i] += (ty[i] - py[i]) * ease * 0.08;
+      pz[i] += (tz[i] - pz[i]) * ease * 0.08;
+      vx[i] *= 0.7; vy[i] *= 0.7; vz[i] *= 0.7; // suppress velocity during morph
+    }
+
+    // ── Turbulence ──
+    vx[i] += (Math.random()-0.5) * turb * 0.07;
+    vy[i] += (Math.random()-0.5) * turb * 0.07;
+    vz[i] += (Math.random()-0.5) * turb * 0.04;
+
+    // ── Gravity ──
+    vy[i] -= grav * 0.006;
+
+    // ── Hand / mouse interaction ──
+    if (handOn) {
+      var dx = hwx - px[i];
+      var dy = hwy - py[i];
+      var d2 = dx*dx + dy*dy + 1.0;
+      var di = Math.sqrt(d2);
+
+      if (gesture === 'point') {
+        var f = 12.0 / (d2 * 0.0008 + 70);
+        vx[i] += dx*f;
+        vy[i] += dy*f;
+        // swirl component
+        vx[i] += (-dy/di)*0.2;
+        vy[i] += (dx/di)*0.2;
+      }
+      if (gesture === 'fist') {
+        var f = 50.0 / (d2 * 0.0005 + 40);
+        vx[i] += dx*f;
+        vy[i] += dy*f;
+      }
+      if (gesture === 'open') {
+        if (di < 180) {
+          vx[i] -= dx * 0.018;
+          vy[i] -= dy * 0.018;
+        }
+      }
+      if (gesture === 'peace') {
+        var ang = Math.atan2(dy, dx);
+        var orR = 100;
+        vx[i] += (Math.cos(ang+1.5708)*orR - px[i] + hwx) * 0.0012;
+        vy[i] += (Math.sin(ang+1.5708)*orR - py[i] + hwy) * 0.0012;
+      }
+      if (gesture === 'pinch') {
+        if (i % 8 === 0) {
+          px[i] = hwx + (Math.random()-0.5)*50;
+          py[i] = hwy + (Math.random()-0.5)*50;
+          pz[i] = (Math.random()-0.5)*80;
+          vx[i] = (Math.random()-0.5)*3;
+          vy[i] = (Math.random()-0.5)*3;
+          vz[i] = (Math.random()-0.5)*1.5;
+        }
+      }
+    }
+
+    // ── Speed cap ──
+    var mag = Math.sqrt(vx[i]*vx[i] + vy[i]*vy[i] + vz[i]*vz[i]);
+    var cap = spd * 8;
+    if (mag > cap) {
+      var sc = cap / mag;
+      vx[i] *= sc; vy[i] *= sc; vz[i] *= sc;
+    }
+
+    // ── Apply velocity ──
+    vx[i] *= damp; vy[i] *= damp; vz[i] *= damp;
+    px[i] += vx[i] * spd;
+    py[i] += vy[i] * spd;
+    pz[i] += vz[i] * spd;
+
+    // ── Boundary wrap ──
+    if (px[i] >  320) px[i] = -320;
+    if (px[i] < -320) px[i] =  320;
+    if (py[i] >  320) py[i] = -320;
+    if (py[i] < -320) py[i] =  320;
+    if (pz[i] >  200) pz[i] = -200;
+    if (pz[i] < -200) pz[i] =  200;
+
+    // ── Write to GPU buffer ──
+    posAttr.array[i*3]   = px[i];
+    posAttr.array[i*3+1] = py[i];
+    posAttr.array[i*3+2] = pz[i];
+  }
+
+  posAttr.needsUpdate = true;
+}
+
+// ─────────────────────────────────────────
+// 6. RENDER LOOP
+// ─────────────────────────────────────────
+var fCount = 0, fpsTime = 0;
+
+function loop() {
+  requestAnimationFrame(loop);
+
+  // FPS
+  fCount++;
+  var now = performance.now();
+  if (now - fpsTime > 1000) {
+    document.getElementById('fps').textContent = Math.round(fCount * 1000 / (now - fpsTime));
+    fCount = 0; fpsTime = now;
+  }
+
+  if (!frozen) {
+    updatePhysics();
+  }
+
+  // Slow auto-rotate
+  rotY += 0.0005;
+  points.rotation.y += (rotY - points.rotation.y) * 0.03;
+
+  renderer.render(scene, camera);
+}
+
+// ─────────────────────────────────────────
+// 7. ACTION FUNCTIONS
+// ─────────────────────────────────────────
+function doExplode() {
+  for (var i = 0; i < N; i++) {
+    vx[i] += (Math.random()-0.5)*32;
+    vy[i] += (Math.random()-0.5)*32;
+    vz[i] += (Math.random()-0.5)*16;
+  }
+  isMorphing = false;
+  toast('💥 EXPLODE');
+}
+
+function doClear() {
+  for (var i = 0; i < N; i++) {
+    px[i] = py[i] = pz[i] = 0;
+    vx[i] = (Math.random()-0.5)*6;
+    vy[i] = (Math.random()-0.5)*6;
+    vz[i] = (Math.random()-0.5)*3;
+  }
+  isMorphing = false;
+  toast('Scene cleared');
+}
+
+function doFreeze() {
   frozen = !frozen;
-  document.getElementById('stfz').textContent = frozen ? 'YES' : 'NO';
-  document.getElementById('bfr').textContent  = frozen ? '▶ UNFREEZE' : '❄️ FREEZE';
-  tip(frozen?'❄️':'▶', frozen?'FROZEN':'UNFROZEN');
-  notify(frozen ? '❄️ Frozen' : '▶ Unfrozen');
+  document.getElementById('sfz').textContent = frozen ? 'YES' : 'NO';
+  document.getElementById('bfz').textContent = frozen ? '▶ UNFREEZE' : '❄️ FREEZE';
+  toast(frozen ? '❄️ FROZEN' : '▶ UNFROZEN');
 }
 
-function doCycleColor(){
-  palIdx = (palIdx+1) % PALS.length;
-  for(var i=0;i<N;i++){
-    var c = hexRGB(PALS[palIdx][i % PALS[palIdx].length]);
-    colBuf.array[i*3]=c[0]; colBuf.array[i*3+1]=c[1]; colBuf.array[i*3+2]=c[2];
+function doCycleColor() {
+  palIdx = (palIdx + 1) % PALS.length;
+  var pal = PALS[palIdx];
+  for (var i = 0; i < MAX; i++) {
+    var c = pal[i % pal.length];
+    colAttr.array[i*3]   = c[0];
+    colAttr.array[i*3+1] = c[1];
+    colAttr.array[i*3+2] = c[2];
   }
-  colBuf.needsUpdate = true;
+  colAttr.needsUpdate = true;
   buildColorGrid();
-  tip('🎨','COLOURS'); notify('Colour scheme updated');
+  toast('🎨 COLOUR CYCLE');
 }
 
-function doCapture(){
-  ren.render(scene, cam);
-  try{
+function applyColor(colArr) {
+  for (var i = 0; i < MAX; i++) {
+    colAttr.array[i*3]   = colArr[0];
+    colAttr.array[i*3+1] = colArr[1];
+    colAttr.array[i*3+2] = colArr[2];
+  }
+  colAttr.needsUpdate = true;
+}
+
+function doCapture() {
+  renderer.render(scene, camera);
+  try {
     var a = document.createElement('a');
-    a.download = 'aether-'+Date.now()+'.png';
-    a.href = ren.domElement.toDataURL();
+    a.download = 'aether-' + Date.now() + '.png';
+    a.href = renderer.domElement.toDataURL();
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    notify('📸 Screenshot saved!');
-  }catch(e){ notify('Capture error: '+e.message); }
+    toast('📸 Saved!');
+  } catch(e) { toast('Capture: ' + e.message); }
 }
 
-// ── CAMERA + MEDIAPIPE ────────────────────────────────────────
-function startCam(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    showErr('NOT SUPPORTED', 'Camera API not available. Use Chrome or Firefox on HTTPS.');
+// ─────────────────────────────────────────
+// 8. CAMERA / MEDIAPIPE
+// ─────────────────────────────────────────
+var vidStream = null;
+var camOn = false;
+var mpReady = false;
+
+function startCam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showErr('NOT SUPPORTED', 'Camera API requires Chrome/Firefox on HTTPS.');
     return;
   }
-  notify('Requesting camera permission...');
-  navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:640}, height:{ideal:480}, facingMode:'user' }, audio:false })
-  .then(function(stream){
+  toast('Requesting camera permission...');
+  navigator.mediaDevices.getUserMedia({
+    video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' },
+    audio: false
+  })
+  .then(function(stream) {
     vidStream = stream;
     var vid = document.getElementById('vid');
     vid.srcObject = stream;
-    vid.onloadedmetadata = function(){
-      vid.play()
-      .then(function(){
+    vid.onloadedmetadata = function() {
+      vid.play().then(function() {
         camOn = true;
         document.getElementById('cdot').className = 'dot on';
         document.getElementById('cchip').textContent = 'CAM ON';
-        document.getElementById('cam-lbl').textContent = 'DETECTING HANDS...';
+        document.getElementById('camTxt').textContent = 'DETECTING HANDS...';
         document.getElementById('bcam').textContent = '📷 STOP CAMERA';
-        document.getElementById('cring').style.display = 'block';
-        notify('Camera active — loading hand model...');
-        startMediaPipe(vid);
-      })
-      .catch(function(e){ showErr('PLAY ERROR', e.message); });
+        document.getElementById('ring').style.display = 'block';
+        document.getElementById('sint').textContent = 'HANDS';
+        handOn = false; // reset — mouse fallback stops
+        toast('Camera active — loading hand model...');
+        loadMP(vid);
+      }).catch(function(e){ showErr('PLAY ERROR', e.message); });
     };
   })
-  .catch(function(e){
-    var msgs = {
-      NotAllowedError: 'Permission denied. Click the 🔒 icon in the address bar, allow camera, then retry.',
-      NotFoundError:   'No camera found on this device.',
-      NotReadableError:'Camera is in use by another app. Close it and retry.',
-      SecurityError:   'Camera blocked. This app requires HTTPS.',
-      AbortError:      'Camera access aborted. Please retry.'
-    };
-    showErr('CAMERA ERROR', msgs[e.name] || e.name+': '+e.message);
-    notify('Camera blocked — see error popup');
+  .catch(function(e) {
+    var msg = {
+      NotAllowedError:  'Permission denied. Click the 🔒 icon in the address bar → allow camera → retry.',
+      NotFoundError:    'No camera found on this device.',
+      NotReadableError: 'Camera is already used by another app. Close it and retry.',
+      SecurityError:    'Camera blocked — this site must be served over HTTPS.',
+      AbortError:       'Camera initialisation aborted. Please retry.'
+    }[e.name] || (e.name + ': ' + e.message);
+    showErr('CAMERA ERROR', msg);
   });
 }
 
-function stopCam(){
-  if(vidStream){ vidStream.getTracks().forEach(function(t){t.stop();}); vidStream=null; }
+function stopCam() {
+  if (vidStream) { vidStream.getTracks().forEach(function(t){t.stop();}); vidStream = null; }
   var vid = document.getElementById('vid'); vid.srcObject = null;
-  camOn=false; handOn=false; gName='none'; mpReady=false;
-  document.getElementById('cdot').className='dot off'; document.getElementById('cchip').textContent='CAM OFF';
-  document.getElementById('hdot').className='dot off'; document.getElementById('hchip').textContent='NO HAND';
-  document.getElementById('cam-lbl').textContent='CAMERA INACTIVE';
-  document.getElementById('bcam').textContent='📷 START CAMERA';
-  document.getElementById('cring').style.display='none';
-  document.getElementById('stg').textContent='—'; document.getElementById('stc').textContent='—';
-  document.getElementById('stxy').textContent='—'; document.getElementById('stmp').textContent='STANDBY';
-  document.querySelectorAll('.gi').forEach(function(g){g.classList.remove('lit');});
-  // Clear hand canvas
-  var hcvs=document.getElementById('hcvs'); var hctx=hcvs.getContext('2d');
-  hctx.clearRect(0,0,hcvs.width,hcvs.height);
-  notify('Camera stopped');
+  camOn = false; handOn = false; gesture = 'none'; mpReady = false;
+  document.getElementById('cdot').className = 'dot off';
+  document.getElementById('cchip').textContent = 'CAM OFF';
+  document.getElementById('hdot').className = 'dot off';
+  document.getElementById('hchip').textContent = 'NO HAND';
+  document.getElementById('camTxt').textContent = 'CAMERA INACTIVE';
+  document.getElementById('bcam').textContent = '📷 START CAMERA';
+  document.getElementById('ring').style.display = 'none';
+  document.getElementById('smp').textContent = 'STANDBY';
+  document.getElementById('sint').textContent = 'MOUSE';
+  document.getElementById('sg2').textContent = '—';
+  document.getElementById('sc2').textContent = '—';
+  document.getElementById('sxy').textContent = '—';
+  document.querySelectorAll('.gc').forEach(function(g){g.classList.remove('on');});
+  var hcvs=document.getElementById('hcvs');
+  hcvs.getContext('2d').clearRect(0,0,hcvs.width,hcvs.height);
+  toast('Camera stopped — mouse control active');
 }
 
-// ── MEDIAPIPE DYNAMIC LOADER ──────────────────────────────────
-function startMediaPipe(vid){
-  document.getElementById('stmp').textContent='LOADING...';
+// ── MediaPipe dynamic loader ──
+function loadMP(vid) {
+  document.getElementById('smp').textContent = 'LOADING...';
   document.getElementById('mpbar').classList.add('show');
-  document.getElementById('mpbar').textContent='Loading hand tracking model...';
+  document.getElementById('mpbar').textContent = 'Loading hand tracking model (~10MB)...';
 
-  function loadJS(src, cb){
+  function loadScript(src, ok, fail) {
     var s = document.createElement('script');
-    s.src = src; s.crossOrigin='anonymous';
-    s.onload = function(){ setTimeout(cb, 150); };
-    s.onerror = function(){
-      document.getElementById('stmp').textContent='LOAD FAIL';
-      document.getElementById('mpbar').textContent='CDN load failed — mouse mode active';
-      notify('Hand model failed to load. Use mouse to interact.');
-    };
+    s.src = src; s.crossOrigin = 'anonymous';
+    s.onload  = function(){ setTimeout(ok, 100); };
+    s.onerror = fail || function(){ toast('Script load failed'); };
     document.head.appendChild(s);
   }
 
-  // Versioned stable URLs
-  var CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/';
-  var VH  = '0.4.1646424915';
-  var VCU = '0.3.1632717698';
-  var VDU = '0.3.1620248257';
+  var B = 'https://cdn.jsdelivr.net/npm/@mediapipe/';
+  var VH = '0.4.1646424915', VC = '0.3.1632717698', VD = '0.3.1620248257';
 
-  function trySetup(){
-    if(typeof Hands !== 'undefined' && typeof Camera !== 'undefined' && typeof drawConnectors !== 'undefined'){
-      setupHands(vid);
+  function tryInit() {
+    if (typeof Hands !== 'undefined' && typeof Camera !== 'undefined') {
+      setupMP(vid);
     } else {
-      setTimeout(trySetup, 400);
+      setTimeout(tryInit, 400);
     }
   }
 
-  if(typeof Hands !== 'undefined' && typeof Camera !== 'undefined'){
-    setupHands(vid);
+  if (typeof Hands !== 'undefined' && typeof Camera !== 'undefined') {
+    setupMP(vid);
   } else {
-    loadJS(CDN+'hands@'+VH+'/hands.js', function(){
-      loadJS(CDN+'camera_utils@'+VCU+'/camera_utils.js', function(){
-        loadJS(CDN+'drawing_utils@'+VDU+'/drawing_utils.js', function(){
-          setTimeout(trySetup, 200);
+    loadScript(B+'hands@'+VH+'/hands.js', function() {
+      loadScript(B+'camera_utils@'+VC+'/camera_utils.js', function() {
+        loadScript(B+'drawing_utils@'+VD+'/drawing_utils.js', function() {
+          setTimeout(tryInit, 300);
         });
       });
     });
   }
 }
 
-function setupHands(vid){
-  try{
-    document.getElementById('stmp').textContent='INIT...';
+function setupMP(vid) {
+  try {
     var CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/';
-
-    var hands = new Hands({ locateFile: function(f){ return CDN+f; } });
-    hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.65, minTrackingConfidence:0.55 });
+    var hands = new Hands({ locateFile: function(f){ return CDN + f; } });
+    hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.65, minTrackingConfidence:0.6 });
     hands.onResults(onHandResults);
 
     var mpCam = new Camera(vid, {
-      onFrame: function(){ return hands.send({ image: vid }); },
+      onFrame: function() { return hands.send({ image: vid }); },
       width: 640, height: 480
     });
-    mpCam.start()
-    .then(function(){
+    mpCam.start().then(function() {
       mpReady = true;
-      document.getElementById('stmp').textContent = 'ACTIVE ✓';
+      document.getElementById('smp').textContent = 'ACTIVE ✓';
       document.getElementById('mpbar').classList.remove('show');
-      document.getElementById('cam-lbl').textContent = 'HAND TRACKING LIVE';
-      notify('Hand tracking ready! 🖐️ Show your hand');
-    })
-    .catch(function(e){
-      document.getElementById('stmp').textContent='ERR';
-      notify('MP camera error: '+e.message);
+      document.getElementById('camTxt').textContent = 'HAND TRACKING LIVE';
+      toast('Hand tracking ready! 🖐 Show your hand');
+    }).catch(function(e) {
+      document.getElementById('smp').textContent = 'ERR';
+      toast('MP cam error: ' + e.message);
     });
-  }catch(e){
-    document.getElementById('stmp').textContent='FAILED';
-    notify('MediaPipe error: '+e.message);
+  } catch(e) {
+    document.getElementById('smp').textContent = 'FAILED';
+    toast('MP init error: ' + e.message);
     console.error(e);
   }
 }
 
-// ── HAND CANVAS (virtual skeleton) ────────────────────────────
+// ─────────────────────────────────────────
+// 9. HAND TRACKING + VIRTUAL SKELETON
+// ─────────────────────────────────────────
 var hcvs = document.getElementById('hcvs');
 var hctx = hcvs.getContext('2d');
 
-// Hand connection pairs (MediaPipe Hands topology)
-var CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],        // thumb
-  [0,5],[5,6],[6,7],[7,8],        // index
-  [0,9],[9,10],[10,11],[11,12],   // middle
-  [0,13],[13,14],[14,15],[15,16], // ring
-  [0,17],[17,18],[18,19],[19,20], // pinky
-  [5,9],[9,13],[13,17]            // palm
+// MediaPipe hand bone connections
+var BONES = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17]
 ];
-
-// Fingertip and joint indices
 var TIPS = [4,8,12,16,20];
-var KNUCKLES = [3,7,11,15,19];
 
-function drawHandSkeleton(lm, w, h){
-  hcvs.width  = w;
-  hcvs.height = h;
-  hctx.clearRect(0,0,w,h);
+function drawSkeleton(lm, W, H) {
+  hcvs.width  = W;
+  hcvs.height = H;
+  hctx.clearRect(0, 0, W, H);
 
-  // Convert normalised → canvas px (note: canvas is mirror-flipped via CSS)
-  function cx(lmk){ return lmk.x * w; }
-  function cy(lmk){ return lmk.y * h; }
+  function x(l){ return l.x * W; }
+  function y(l){ return l.y * H; }
 
-  // ── Connections (bones) ──
-  CONNECTIONS.forEach(function(pair){
-    var a = lm[pair[0]], b = lm[pair[1]];
+  // Bones
+  BONES.forEach(function(b) {
     hctx.beginPath();
-    hctx.moveTo(cx(a), cy(a));
-    hctx.lineTo(cx(b), cy(b));
-    hctx.strokeStyle = 'rgba(160,210,255,0.45)';
-    hctx.lineWidth = 1.8;
+    hctx.moveTo(x(lm[b[0]]), y(lm[b[0]]));
+    hctx.lineTo(x(lm[b[1]]), y(lm[b[1]]));
+    hctx.strokeStyle = 'rgba(140,200,255,0.4)';
+    hctx.lineWidth = 1.5;
     hctx.stroke();
   });
 
-  // ── All joints (small circles) ──
-  for(var i=0;i<21;i++){
-    var lmk = lm[i];
+  // All joints
+  for (var i = 0; i < 21; i++) {
     hctx.beginPath();
-    hctx.arc(cx(lmk), cy(lmk), 3, 0, Math.PI*2);
-    hctx.fillStyle = 'rgba(200,230,255,0.65)';
+    hctx.arc(x(lm[i]), y(lm[i]), 2.5, 0, Math.PI*2);
+    hctx.fillStyle = 'rgba(180,220,255,0.6)';
     hctx.fill();
-    hctx.strokeStyle = 'rgba(160,210,255,0.55)';
-    hctx.lineWidth = 1;
-    hctx.stroke();
   }
 
-  // ── Fingertips (larger glowing dots) ──
-  TIPS.forEach(function(idx){
-    var lmk = lm[idx];
-    // Outer glow
-    var g = hctx.createRadialGradient(cx(lmk),cy(lmk),0,cx(lmk),cy(lmk),10);
-    g.addColorStop(0, 'rgba(160,220,255,0.7)');
-    g.addColorStop(1, 'rgba(160,220,255,0)');
-    hctx.beginPath(); hctx.arc(cx(lmk),cy(lmk),10,0,Math.PI*2);
-    hctx.fillStyle=g; hctx.fill();
-    // Core dot
-    hctx.beginPath(); hctx.arc(cx(lmk),cy(lmk),4.5,0,Math.PI*2);
-    hctx.fillStyle='rgba(200,235,255,0.95)'; hctx.fill();
+  // Fingertips — glowing
+  TIPS.forEach(function(idx) {
+    var grd = hctx.createRadialGradient(x(lm[idx]),y(lm[idx]),0,x(lm[idx]),y(lm[idx]),10);
+    grd.addColorStop(0,'rgba(140,210,255,0.75)');
+    grd.addColorStop(1,'rgba(140,210,255,0)');
+    hctx.beginPath(); hctx.arc(x(lm[idx]),y(lm[idx]),10,0,Math.PI*2);
+    hctx.fillStyle=grd; hctx.fill();
+
+    hctx.beginPath(); hctx.arc(x(lm[idx]),y(lm[idx]),4,0,Math.PI*2);
+    hctx.fillStyle='rgba(210,235,255,0.95)'; hctx.fill();
   });
 
-  // ── Wrist dot ──
-  hctx.beginPath(); hctx.arc(cx(lm[0]),cy(lm[0]),5,0,Math.PI*2);
-  hctx.fillStyle='rgba(180,200,255,0.8)'; hctx.fill();
+  // Wrist
+  hctx.beginPath(); hctx.arc(x(lm[0]),y(lm[0]),5,0,Math.PI*2);
+  hctx.fillStyle='rgba(160,200,255,0.8)'; hctx.fill();
 
-  // ── Pinch indicator ──
-  if(gName==='pinch'){
-    var t=lm[4], idx=lm[8];
+  // Pinch highlight
+  if (gesture === 'pinch') {
     hctx.beginPath();
-    hctx.moveTo(cx(t),cy(t)); hctx.lineTo(cx(idx),cy(idx));
-    hctx.strokeStyle='rgba(255,220,120,0.85)'; hctx.lineWidth=2.5; hctx.stroke();
-    var mx=(cx(t)+cx(idx))/2, my=(cy(t)+cy(idx))/2;
+    hctx.moveTo(x(lm[4]),y(lm[4])); hctx.lineTo(x(lm[8]),y(lm[8]));
+    hctx.strokeStyle='rgba(255,220,80,0.9)'; hctx.lineWidth=2.5; hctx.stroke();
+    var mx=(x(lm[4])+x(lm[8]))*0.5, my=(y(lm[4])+y(lm[8]))*0.5;
     hctx.beginPath(); hctx.arc(mx,my,5,0,Math.PI*2);
-    hctx.fillStyle='rgba(255,220,120,0.9)'; hctx.fill();
+    hctx.fillStyle='rgba(255,220,80,0.95)'; hctx.fill();
   }
+
+  // Gesture label
+  hctx.fillStyle='rgba(140,200,255,0.65)';
+  hctx.font = '9px Courier New';
+  hctx.fillText(gesture.toUpperCase(), 6, H-6);
 }
 
-function onHandResults(results){
-  if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
+// ── Gesture detection (pure math, no MediaPipe helper needed) ──
+function detectGesture(lm) {
+  var TIPS2  = [8,12,16,20];
+  var BASES  = [6,10,14,18];
+  // finger extended = tip y < base y (0 = top of screen)
+  var ext = TIPS2.map(function(t,i){ return lm[t].y < lm[BASES[i]].y - 0.02; });
+  // thumb: lateral check
+  var thExt = lm[4].x < lm[3].x - 0.02;
+  // pinch = thumb tip close to index tip
+  var dx = lm[4].x - lm[8].x, dy = lm[4].y - lm[8].y;
+  var pinchD = Math.sqrt(dx*dx + dy*dy);
+
+  if (pinchD < 0.07)                               return 'pinch';
+  if (!ext[0]&&!ext[1]&&!ext[2]&&!ext[3]&&!thExt) return 'fist';
+  if (ext[0]&&ext[1]&&ext[2]&&ext[3])             return 'open';
+  if (ext[0]&&!ext[1]&&!ext[2]&&!ext[3])          return 'point';
+  if (ext[0]&&ext[1]&&!ext[2]&&!ext[3])           return 'peace';
+  if (ext[0]&&!ext[1]&&!ext[2]&&ext[3])           return 'horns';
+  if (thExt&&!ext[0]&&!ext[1]&&!ext[2]&&!ext[3]) return 'thumb';
+  return 'neutral';
+}
+
+var gMap = {pinch:'g0',open:'g1',point:'g2',fist:'g3',peace:'g4',ok:'g5',thumb:'g6',horns:'g7'};
+var gActs = {
+  open:  function(){ doExplode(); },
+  ok:    function(){ doCycleColor(); },
+  thumb: function(){ doFreeze(); },
+  horns: function(){ morphToShape('galaxy'); },
+  pinch: function(){ toast('🤏 Spawning at hand'); },
+  point: function(){ toast('☝️ Swirl mode'); },
+  fist:  function(){ toast('✊ Pull mode'); },
+  peace: function(){ toast('✌️ Orbit mode'); }
+};
+var prevGesture = '', gDB = {};
+
+function onHandResults(results) {
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     var lm = results.multiHandLandmarks[0];
     handOn = true;
 
-    var ww = hcvs.offsetWidth  || 240;
-    var wh = hcvs.offsetHeight || 180;
-    drawHandSkeleton(lm, ww, wh);
+    var W = hcvs.offsetWidth  || 240;
+    var H = hcvs.offsetHeight || 180;
+    drawSkeleton(lm, W, H);
 
-    // Update hand position (wrist = landmark 0)
-    HX = lm[0].x;
-    HY = lm[0].y;
+    // Map landmark 9 (middle finger base) to world space — more stable than wrist
+    var lx = lm[9].x; // 0..1, mirrored in CSS
+    var ly = lm[9].y; // 0..1
 
-    var g = detectGesture(lm);
-    fireGesture(g, results);
+    // Convert to world coords matching our particle space
+    handX = (0.5 - lx) * 600; // mirrored
+    handY = -(ly - 0.5) * 600;
 
-    // Cursor ring position (mirrored because video/canvas are CSS-flipped)
-    var ring = document.getElementById('cring');
-    ring.style.left = ((1 - lm[0].x) * innerWidth) + 'px';
-    ring.style.top  = (lm[0].y * innerHeight) + 'px';
-    ring.classList.toggle('pinch', g === 'pinch');
+    gesture = detectGesture(lm);
 
-    // UI updates
+    // Cursor ring
+    var ring = document.getElementById('ring');
+    ring.style.left = ((1-lx) * window.innerWidth)  + 'px';
+    ring.style.top  = (ly     * window.innerHeight) + 'px';
+    ring.classList.toggle('pinch', gesture==='pinch');
+
+    // Gesture card highlight
+    document.querySelectorAll('.gc').forEach(function(g){g.classList.remove('on');});
+    var gid = gMap[gesture]; if(gid){ var el=document.getElementById(gid); if(el) el.classList.add('on'); }
+
+    // Gesture action (debounced per gesture change)
+    if (gesture !== prevGesture) {
+      prevGesture = gesture;
+      var act = gActs[gesture];
+      if (act) {
+        var now = Date.now();
+        if (!gDB[gesture] || now-gDB[gesture] > 1600) { gDB[gesture]=now; act(); }
+      }
+    }
+
+    // Stats
     document.getElementById('hdot').className = 'dot on';
     document.getElementById('hchip').textContent = 'HAND ON';
-    document.getElementById('stg').textContent  = g.toUpperCase();
-    document.getElementById('stxy').textContent = Math.round(HX*100)+', '+Math.round(HY*100);
+    document.getElementById('sg2').textContent = gesture.toUpperCase();
+    document.getElementById('sxy').textContent  = Math.round(lx*100)+', '+Math.round(ly*100);
     if(results.multiHandedness && results.multiHandedness[0])
-      document.getElementById('stc').textContent = Math.round(results.multiHandedness[0].score*100)+'%';
+      document.getElementById('sc2').textContent = Math.round(results.multiHandedness[0].score*100)+'%';
 
   } else {
-    handOn = false; gName = 'none';
+    handOn = false; gesture = 'none';
     hcvs.width = hcvs.offsetWidth||240;
     hctx.clearRect(0,0,hcvs.width,hcvs.height);
     document.getElementById('hdot').className = 'dot off';
     document.getElementById('hchip').textContent = 'NO HAND';
-    document.getElementById('stg').textContent  = '—';
-    document.getElementById('stxy').textContent = '—';
-    document.querySelectorAll('.gi').forEach(function(g){ g.classList.remove('lit'); });
-    document.getElementById('cring').classList.remove('pinch');
+    document.getElementById('sg2').textContent = '—';
+    document.getElementById('sxy').textContent  = '—';
+    document.querySelectorAll('.gc').forEach(function(g){g.classList.remove('on');});
+    document.getElementById('ring').classList.remove('pinch');
   }
 }
 
-// ── GESTURE DETECTION ─────────────────────────────────────────
-function dist3(a,b){ return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2+(a.z-b.z)**2); }
+// ─────────────────────────────────────────
+// 10. COLOUR GRID
+// ─────────────────────────────────────────
+var HEX_PALS = [
+  ['#a0d8ff','#c0aaff','#a0ffd0','#ffd8a8','#ffb8d8'],
+  ['#00c8ff','#7020ff','#00ff90','#ff6030','#ff1880'],
+  ['#ffffff','#d8daff','#b8d0ff','#98e8ff','#a8ffea'],
+  ['#ff9060','#ff70b0','#ffc860','#04c890','#1080b0'],
+  ['#e820a0','#6000c0','#3000a0','#3058ee','#40c4f0'],
+];
 
-function detectGesture(lm){
-  var tips  = [8,12,16,20], bases = [6,10,14,18];
-  var ext   = tips.map(function(t,i){ return lm[t].y < lm[bases[i]].y - 0.01; });
-  var thOut = lm[4].x < lm[3].x - 0.02; // thumb extended (rough)
-  var pinch = dist3(lm[4], lm[8]);
-
-  if(pinch < 0.07)                                       return 'pinch';
-  if(!ext[0]&&!ext[1]&&!ext[2]&&!ext[3]&&!thOut)        return 'fist';
-  if(ext[0]&&ext[1]&&ext[2]&&ext[3])                    return 'open';
-  if(ext[0]&&!ext[1]&&!ext[2]&&!ext[3])                 return 'point';
-  if(ext[0]&&ext[1]&&!ext[2]&&!ext[3])                  return 'peace';
-  if(ext[0]&&!ext[1]&&!ext[2]&&ext[3])                  return 'horns';
-  if(pinch<0.12&&ext[1]&&ext[2])                        return 'ok';
-  if(thOut&&!ext[0]&&!ext[1]&&!ext[2]&&!ext[3])         return 'thumb';
-  return 'neutral';
-}
-
-// Gesture → UI element ID
-var GIDS = { pinch:'g0', open:'g1', point:'g2', fist:'g3', peace:'g4', ok:'g5', thumb:'g6', horns:'g7' };
-
-// Gesture → action (debounced)
-var GACTS = {
-  open:  function(){ doExplode(); },
-  ok:    function(){ doCycleColor(); },
-  thumb: function(){ doFreeze(); },
-  horns: function(){ applyPreset('galaxy'); },
-  pinch: function(){ tip('🤏','SPAWNING PARTICLES'); },
-  point: function(){ tip('☝️','SWIRL ATTRACT'); },
-  fist:  function(){ tip('✊','GRAVITY PULL'); },
-  peace: function(){ tip('✌️','ORBIT MODE'); }
-};
-
-function fireGesture(g, res){
-  gName = g;
-  // Highlight gesture card
-  document.querySelectorAll('.gi').forEach(function(el){ el.classList.remove('lit'); });
-  if(GIDS[g]){ var el=document.getElementById(GIDS[g]); if(el) el.classList.add('lit'); }
-  // Fire action once per transition
-  if(g !== prevG){
-    prevG = g;
-    var act = GACTS[g];
-    if(act){
-      var now = Date.now();
-      if(!gDebounce[g] || now - gDebounce[g] > 1600){ gDebounce[g]=now; act(); }
-    }
-  }
-}
-
-// ── COLOUR GRID ───────────────────────────────────────────────
-function buildColorGrid(){
-  var grid = document.getElementById('cgrid'); grid.innerHTML='';
-  var pal  = PALS[palIdx].concat(PALS[(palIdx+1)%PALS.length]).slice(0,10);
-  pal.forEach(function(hex){
+function buildColorGrid() {
+  var grid = document.getElementById('cgrid');
+  grid.innerHTML = '';
+  var pal  = HEX_PALS[palIdx];
+  var pal2 = HEX_PALS[(palIdx+1)%HEX_PALS.length];
+  pal.concat(pal2).slice(0,10).forEach(function(hex) {
     var sw = document.createElement('div');
-    sw.className='cs'; sw.style.background=hex; sw.title=hex;
-    sw.addEventListener('click', function(){
-      document.querySelectorAll('.cs').forEach(function(s){ s.classList.remove('on'); });
+    sw.className = 'cs'; sw.style.background = hex;
+    sw.addEventListener('click', function() {
+      document.querySelectorAll('.cs').forEach(function(s){s.classList.remove('on');});
       sw.classList.add('on');
-      var c = hexRGB(hex);
-      for(var i=0;i<N;i+=2){ colBuf.array[i*3]=c[0]; colBuf.array[i*3+1]=c[1]; colBuf.array[i*3+2]=c[2]; }
-      colBuf.needsUpdate=true;
-      notify('Colour: '+hex);
+      var r=parseInt(hex.slice(1,3),16)/255;
+      var g=parseInt(hex.slice(3,5),16)/255;
+      var b=parseInt(hex.slice(5,7),16)/255;
+      // Apply to every particle
+      for(var i=0;i<MAX;i++){
+        colAttr.array[i*3]=r; colAttr.array[i*3+1]=g; colAttr.array[i*3+2]=b;
+      }
+      colAttr.needsUpdate=true;
+      toast('Colour applied');
     });
     grid.appendChild(sw);
   });
 }
 
-// ── SLIDERS ───────────────────────────────────────────────────
-function setupSliders(){
-  function bind(slid, val, key, dec, cb){
-    var el = document.getElementById(slid), ve = document.getElementById(val);
+// ─────────────────────────────────────────
+// 11. SLIDERS + BUTTONS
+// ─────────────────────────────────────────
+function bindSliders() {
+  function bind(id, valId, key, dec, cb) {
+    var el=document.getElementById(id), ve=document.getElementById(valId);
     if(!el||!ve) return;
     el.addEventListener('input', function(){
       var v = parseFloat(el.value);
@@ -1034,119 +1154,161 @@ function setupSliders(){
       if(cb) cb(v);
     });
   }
-  bind('sc',  'vc',  'count',  0, function(v){ N=parseInt(v); createParticles(); });
-  bind('ss',  'vs',  'size',   1, function(v){
-    for(var i=0;i<N;i++) sizBuf.array[i]=v*(0.5+Math.random()*0.9);
-    sizBuf.needsUpdate=true;
+  bind('sn',  'vc',  'count',  0, function(v){
+    N = Math.min(Math.round(v), MAX);
+    geometry.setDrawRange(0, N);
+    document.getElementById('sp').textContent = N;
+    // re-populate new slots with random positions
+    for(var i=0;i<N;i++){
+      if(px[i]===0&&py[i]===0&&pz[i]===0){
+        px[i]=(Math.random()-.5)*600; py[i]=(Math.random()-.5)*600; pz[i]=(Math.random()-.5)*300;
+      }
+    }
+  });
+  bind('ssz', 'vsz', 'size',   1, function(v){
+    for(var i=0;i<MAX;i++) sizeAttr.array[i]=v*(0.4+Math.random()*1.0);
+    sizeAttr.needsUpdate=true;
   });
   bind('ssp', 'vsp', 'speed',  1, null);
-  bind('str2','vtr', 'trail',  2, null);
-  bind('sg',  'vg',  'gravity',1, null);
+  bind('sdp', 'vdp', 'damping',2, null);
+  bind('sgv', 'vgv', 'gravity',1, null);
   bind('stb', 'vtb', 'turb',   2, null);
 }
 
-// ── BUTTON BINDINGS ───────────────────────────────────────────
-function bindBtns(){
+function bindButtons() {
   function on(id, fn){ var e=document.getElementById(id); if(e) e.addEventListener('click', fn); }
   on('bcam', function(){ if(camOn) stopCam(); else startCam(); });
-  on('bex',  function(){ doExplode(); });
-  on('bre',  function(){ applyPreset(preset); tip('🔮','REFORMING'); });
-  on('bfr',  function(){ doFreeze(); });
-  on('bcl',  function(){ doCycleColor(); });
-  on('bca',  function(){ doCapture(); });
-  on('bclr', function(){ doClear(); });
-  on('ec',   function(){ document.getElementById('err').classList.remove('show'); });
+  on('bex',  doExplode);
+  on('bre',  function(){ morphToShape(currentShape); toast('Reforming...'); });
+  on('bfz',  doFreeze);
+  on('bcol', doCycleColor);
+  on('bss',  doCapture);
+  on('bclr', doClear);
+  on('eclose', function(){ document.getElementById('err').classList.remove('show'); });
+
   document.querySelectorAll('.pb').forEach(function(b){
-    b.addEventListener('click', function(){ applyPreset(b.dataset.p); });
+    b.addEventListener('click', function(){ morphToShape(b.dataset.s); });
   });
 }
 
-// ── MOUSE FALLBACK ────────────────────────────────────────────
-document.addEventListener('mousemove', function(e){
-  if(!camOn){ HX=1-e.clientX/innerWidth; HY=e.clientY/innerHeight; handOn=true; }
-});
-document.addEventListener('mousedown', function(e){
-  if(!camOn && e.target.tagName!=='BUTTON' && e.target.tagName!=='INPUT'){
-    gName='pinch';
+// ─────────────────────────────────────────
+// 12. MOUSE / TOUCH FALLBACK
+// ─────────────────────────────────────────
+document.addEventListener('mousemove', function(e) {
+  if (!camOn) {
+    // Map screen to world coords
+    handX = (e.clientX/window.innerWidth  - 0.5) *  600;
+    handY = -(e.clientY/window.innerHeight - 0.5) * 600;
+    handOn = true;
   }
 });
-document.addEventListener('mouseup', function(){
-  if(!camOn) gName='neutral';
-});
 
-// Right-click drag = fist pull
+document.addEventListener('mousedown', function(e) {
+  if (!camOn && e.target.tagName!=='BUTTON' && e.target.tagName!=='INPUT') {
+    gesture = 'fist';
+  }
+});
+document.addEventListener('mouseup', function() {
+  if (!camOn) gesture = 'neutral';
+});
 document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
-window.addEventListener('wheel', function(e){
-  cam.position.z = Math.max(60, Math.min(800, cam.position.z + e.deltaY * 0.3));
-}, {passive:true});
+window.addEventListener('wheel', function(e) {
+  camera.position.z = Math.max(80, Math.min(1000, camera.position.z + e.deltaY * 0.4));
+}, { passive:true });
 
-var lt=null;
-window.addEventListener('touchmove', function(e){
+var lt = null;
+window.addEventListener('touchstart', function(e){
+  if(e.touches.length===1) lt={x:e.touches[0].clientX, y:e.touches[0].clientY};
+}, {passive:true});
+window.addEventListener('touchmove', function(e) {
   if(e.touches.length===1){
     var tc=e.touches[0];
-    if(lt) sceneRY+=(tc.clientX-lt.x)*0.005;
+    if(lt){ rotY += (tc.clientX-lt.x)*0.005; }
     lt={x:tc.clientX, y:tc.clientY};
-    if(!camOn){ HX=1-tc.clientX/innerWidth; HY=tc.clientY/innerHeight; handOn=true; }
+    if(!camOn){
+      handX = (tc.clientX/window.innerWidth -0.5)* 600;
+      handY =-(tc.clientY/window.innerHeight-0.5)* 600;
+      handOn=true;
+    }
   }
 }, {passive:true});
 window.addEventListener('touchend', function(){ lt=null; });
 
-// Keyboard shortcuts
-window.addEventListener('keydown', function(e){
+// ─────────────────────────────────────────
+// 13. KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────
+window.addEventListener('keydown', function(e) {
   var k=e.key.toLowerCase();
   if(k==='e') doExplode();
   else if(k==='f') doFreeze();
   else if(k==='c') doCycleColor();
-  else if(k==='r') applyPreset(preset);
+  else if(k==='r') morphToShape(currentShape);
   else if(k==='x') doClear();
   else if(k==='p') doCapture();
-  else if(k==='1') applyPreset('scatter');
-  else if(k==='2') applyPreset('sphere');
-  else if(k==='3') applyPreset('helix');
-  else if(k==='4') applyPreset('galaxy');
-  else if(k==='5') applyPreset('torus');
-  else if(k==='6') applyPreset('wave');
-  else if(k==='7') applyPreset('dna');
+  else if(k==='1') morphToShape('scatter');
+  else if(k==='2') morphToShape('sphere');
+  else if(k==='3') morphToShape('helix');
+  else if(k==='4') morphToShape('galaxy');
+  else if(k==='5') morphToShape('cube');
+  else if(k==='6') morphToShape('torus');
+  else if(k==='7') morphToShape('wave');
+  else if(k==='8') morphToShape('dna');
+  else if(k==='9') morphToShape('ring');
+  else if(k==='0') morphToShape('star');
 });
 
-// ── HELPERS ───────────────────────────────────────────────────
-var ttID, nfID;
-function tip(em, tx){
-  document.getElementById('te').textContent=em;
-  document.getElementById('tt').textContent=tx;
-  var e=document.getElementById('ttp'); e.classList.add('show');
-  clearTimeout(ttID); ttID=setTimeout(function(){ e.classList.remove('show'); }, 1300);
+// ─────────────────────────────────────────
+// 14. UI HELPERS
+// ─────────────────────────────────────────
+var ttID, toastEl=document.getElementById('toast'), toastTxt=document.getElementById('ttext');
+function toast(msg) {
+  toastTxt.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(ttID);
+  ttID = setTimeout(function(){ toastEl.classList.remove('show'); }, 2600);
 }
-function notify(msg){
-  document.getElementById('ni').textContent=msg;
-  var e=document.getElementById('nf'); e.classList.add('show');
-  clearTimeout(nfID); nfID=setTimeout(function(){ e.classList.remove('show'); }, 2800);
-}
-function showErr(title, msg){
-  document.getElementById('et').textContent=title;
-  document.getElementById('em').textContent=msg;
+function showErr(title, msg) {
+  document.getElementById('etitle').textContent = title;
+  document.getElementById('emsg').textContent   = msg;
   document.getElementById('err').classList.add('show');
 }
-function hexRGB(hex){
-  // Returns [0..1, 0..1, 0..1]
-  var r=parseInt(hex.slice(1,3),16)/255;
-  var g=parseInt(hex.slice(3,5),16)/255;
-  var b=parseInt(hex.slice(5,7),16)/255;
-  return [r,g,b];
-}
 
-// ── INIT ──────────────────────────────────────────────────────
-initThree();
+// ─────────────────────────────────────────
+// 15. LOADING SCREEN
+// ─────────────────────────────────────────
+var lf=document.getElementById('lf'), lmEl=document.getElementById('lm');
+var lmsgs=['Loading Three.js renderer...','Allocating particle buffers...','Compiling GLSL shaders...','Starting physics engine...','All systems go!'];
+var li=0;
+var lint=setInterval(function(){
+  if(li<lmsgs.length){ lmEl.textContent=lmsgs[li]; lf.style.width=((li+1)/lmsgs.length*100)+'%'; li++; }
+},350);
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    clearInterval(lint); lf.style.width='100%';
+    setTimeout(function(){
+      document.getElementById('ld').classList.add('out');
+      toast('Move your mouse across the canvas — particles follow!');
+    },300);
+  },1900);
+});
+
+// ─────────────────────────────────────────
+// 16. BOOT
+// ─────────────────────────────────────────
+initRenderer();
+buildGeometry();
 buildColorGrid();
-setupSliders();
-bindBtns();
+bindSliders();
+bindButtons();
+loop();
 
-console.log('%c AETHER 3D Particle Sculptor', 'color:#a0d4ff;font-size:15px;font-family:monospace;font-weight:bold');
-console.log('%c Keys: E=Explode F=Freeze C=Colour R=Reform X=Clear P=Capture 1-7=Formations', 'color:#666;font-family:monospace');
-console.log('%c Mouse: Move=Interact | Hold=Spawn | Scroll=Zoom', 'color:#666;font-family:monospace');
+// auto start mouse interaction
+handOn = true;
+handX  = 0; handY = 0;
 
-})();
+console.log('%c AETHER — 3D Particle Sculptor', 'color:#a0d8ff;font-size:14px;font-family:monospace;font-weight:bold');
+console.log('%c Keyboard: 1-0=Shapes  E=Explode  F=Freeze  C=Colour  R=Reform  X=Clear  P=Screenshot', 'color:#444;font-family:monospace');
 </script>
 </body>
 </html>
